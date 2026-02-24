@@ -79,6 +79,12 @@
 
 <script>
 async function fetchJson(url){const r=await fetch(url);return r.json();}
+const escapeHtml=(s)=>String(s)
+  .replaceAll('&','&amp;')
+  .replaceAll('<','&lt;')
+  .replaceAll('>','&gt;')
+  .replaceAll('"','&quot;')
+  .replaceAll("'",'&#39;');
 
 function renderChart(rows){
   const chart=document.getElementById('chart');
@@ -111,9 +117,9 @@ async function load(){
   document.getElementById('latest').innerHTML=`<span class="sev ${latest}">${String(latest).toUpperCase()}</span>`;
   document.getElementById('highCount').textContent=String(rows.filter(r=>['high','critical'].includes(r.severity)).length);
 
-  document.getElementById('recentRows').innerHTML=rows.map(r=>`<tr><td>${new Date(r.created_at).toLocaleString()}</td><td>${r.repo}</td><td>#${r.pr_number}</td><td>${r.score}</td><td class="sev ${r.severity}">${r.severity.toUpperCase()}</td></tr>`).join('')||'<tr><td colspan="5">No data.</td></tr>';
-  document.getElementById('severityRows').innerHTML=(severity.rows||[]).map(r=>`<tr><td class="sev ${r.severity}">${r.severity.toUpperCase()}</td><td>${r.count}</td></tr>`).join('')||'<tr><td colspan="2">No data.</td></tr>';
-  document.getElementById('findingRows').innerHTML=(findings.rows||[]).map(r=>`<tr><td>${r.finding}</td><td>${r.count}</td></tr>`).join('')||'<tr><td colspan="2">No data.</td></tr>';
+  document.getElementById('recentRows').innerHTML=rows.map(r=>`<tr><td>${new Date(r.created_at).toLocaleString()}</td><td>${escapeHtml(r.repo)}</td><td>#${Number(r.pr_number)}</td><td>${Number(r.score)}</td><td class="sev ${escapeHtml(r.severity)}">${escapeHtml(String(r.severity).toUpperCase())}</td></tr>`).join('')||'<tr><td colspan="5">No data.</td></tr>';
+  document.getElementById('severityRows').innerHTML=(severity.rows||[]).map(r=>`<tr><td class="sev ${escapeHtml(r.severity)}">${escapeHtml(String(r.severity).toUpperCase())}</td><td>${Number(r.count)}</td></tr>`).join('')||'<tr><td colspan="2">No data.</td></tr>';
+  document.getElementById('findingRows').innerHTML=(findings.rows||[]).map(r=>`<tr><td>${escapeHtml(r.finding)}</td><td>${Number(r.count)}</td></tr>`).join('')||'<tr><td colspan="2">No data.</td></tr>';
   renderChart(trends.trends||[]);
 }
 

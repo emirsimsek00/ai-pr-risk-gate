@@ -68,6 +68,13 @@
 
     <script>
       const result = document.getElementById('result');
+      const escapeHtml = (s) => String(s)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       document.getElementById('run').addEventListener('click', async () => {
         const payload = {
           repo: document.getElementById('repo').value,
@@ -84,7 +91,7 @@
 
         if (!res.ok) {
           result.style.display = 'block';
-          result.innerHTML = `<h3>Request failed</h3><p>${data.error || 'Unknown error'}</p>`;
+          result.innerHTML = `<h3>Request failed</h3><p>${escapeHtml(data.error || 'Unknown error')}</p>`;
           return;
         }
 
@@ -93,9 +100,9 @@
           <h3>Risk Score: ${data.score}/100</h3>
           <p><span class="pill ${data.severity}">${data.severity.toUpperCase()}</span></p>
           <h4>Findings</h4>
-          <ul>${data.findings.map(f => `<li>${f}</li>`).join('')}</ul>
+          <ul>${data.findings.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>
           <h4>Recommendations</h4>
-          <ul>${data.recommendations.map(r => `<li>${r}</li>`).join('')}</ul>
+          <ul>${data.recommendations.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
         `;
       });
     </script>

@@ -76,6 +76,12 @@ type AnalyzeRequest = {
   files: ChangedFile[];
 };
 
+const MAX_FILES_PER_REQUEST = Number(process.env.MAX_FILES_PER_REQUEST ?? 500);
+const MAX_FILENAME_LENGTH = Number(process.env.MAX_FILENAME_LENGTH ?? 300);
+const MAX_PATCH_LENGTH = Number(process.env.MAX_PATCH_LENGTH ?? 200_000);
+const REPO_NAME_PATTERN = /^[A-Za-z0-9._-]{1,100}$/;
+const OWNER_NAME_PATTERN = /^[A-Za-z0-9._-]{1,100}$/;
+
 function logEvent(level: "info" | "error", req: express.Request, message: string, extra?: Record<string, unknown>) {
   const payload = {
     ts: new Date().toISOString(),
@@ -116,6 +122,18 @@ function validSignature(payload: Buffer, signatureHeader?: string) {
   return crypto.timingSafeEqual(expectedBuf, receivedBuf);
 }
 
+function isValidFilename(filename: string) {
+  if (filename.length === 0 || filename.length > MAX_FILENAME_LENGTH) return false;
+  if (filename.includes("\\") || filename.includes("\0")) return false;
+  if (filename.startsWith("/") || filename.startsWith("~")) return false;
+  if (/\p{C}/u.test(filename)) return false;
+
+  const segments = filename.split("/");
+  if (segments.some((segment) => segment.length === 0 || segment === "." || segment === "..")) return false;
+
+  return true;
+}
+
 function validateAnalyzeRequest(body: AnalyzeRequest) {
   if (!body || typeof body !== "object") {
     return "invalid request body";
@@ -125,16 +143,30 @@ function validateAnalyzeRequest(body: AnalyzeRequest) {
     return "repo, prNumber, and non-empty files are required";
   }
 
+  if (!REPO_NAME_PATTERN.test(body.repo)) {
+    return "repo must match [A-Za-z0-9._-] and be <= 100 chars";
+  }
+
   if (!Number.isInteger(body.prNumber) || body.prNumber <= 0) {
     return "prNumber must be a positive integer";
   }
 
-  if (body.owner !== undefined && (typeof body.owner !== "string" || body.owner.length === 0)) {
-    return "owner must be a non-empty string when provided";
+  if (body.owner !== undefined && (typeof body.owner !== "string" || !OWNER_NAME_PATTERN.test(body.owner))) {
+    return "owner must match [A-Za-z0-9._-] and be <= 100 chars";
   }
 
-  if (body.files.some((file) => typeof file.filename !== "string" || file.filename.length === 0)) {
-    return "each file must include a non-empty filename";
+  if (body.files.length > MAX_FILES_PER_REQUEST) {
+    return `files exceeds max allowed (${MAX_FILES_PER_REQUEST})`;
+  }
+
+  for (const file of body.files) {
+    if (typeof file.filename !== "string" || !isValidFilename(file.filename)) {
+      return "each file must include a valid, safe filename";
+    }
+
+    if (file.patch !== undefined && (typeof file.patch !== "string" || file.patch.length > MAX_PATCH_LENGTH)) {
+      return `patch must be a string <= ${MAX_PATCH_LENGTH} chars`;
+    }
   }
 
   return null;

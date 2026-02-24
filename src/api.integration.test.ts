@@ -21,6 +21,17 @@ describe("api integration", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects path traversal filenames", async () => {
+    const res = await request(app).post("/api/analyze").send({
+      repo: "ai-pr-risk-gate",
+      prNumber: 3,
+      files: [{ filename: "../../etc/passwd", patch: "+x" }]
+    });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toContain("valid, safe filename");
+  });
+
   it("analyzes valid payload", async () => {
     const res = await request(app).post("/api/analyze").send({
       repo: "ai-pr-risk-gate",
