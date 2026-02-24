@@ -18,7 +18,10 @@
         --bad: #8a3c36;
       }
       body { font-family: Manrope, system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
-      .wrap { max-width: 920px; margin: 48px auto; padding: 0 24px; }
+      .wrap { max-width: 920px; margin: 40px auto; padding: 0 24px; }
+      .nav { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+      .nav a { text-decoration:none; color:var(--text); border:1px solid var(--line); background:var(--card); padding:8px 12px; border-radius:999px; font-size:12px; letter-spacing:.04em; text-transform:uppercase; }
+      .nav a.active { background:var(--accent); color:#fff; border-color:var(--accent); }
       .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px; margin-bottom: 16px; box-shadow: 0 8px 22px rgba(31, 26, 23, .06); }
       h1 { margin: 0 0 8px 0; font-family: "Cormorant Garamond", Georgia, serif; letter-spacing: .2px; font-size: 2.15rem; line-height: 1.15; }
       p { color: var(--muted); line-height: 1.6; margin: 0; }
@@ -38,6 +41,12 @@
   </head>
   <body>
     <div class="wrap">
+      <nav class="nav" aria-label="Primary">
+        <a class="active" href="/">Analyzer</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/openapi.yaml" target="_blank" rel="noreferrer">API Spec</a>
+        <a href="/docs/onboarding" target="_blank" rel="noreferrer">Onboarding</a>
+      </nav>
       <div class="card">
         <h1>AI PR Risk Gate</h1>
         <p>Interactive demo endpoint for your internship portfolio. Paste a sample PR diff and get a risk score.</p>

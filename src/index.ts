@@ -131,6 +131,14 @@ app.get("/dashboard", (_req, res) => {
   res.sendFile(path.join(publicDir, "dashboard.html"));
 });
 
+app.get("/openapi.yaml", (_req, res) => {
+  res.sendFile(path.join(__dirname, "..", "openapi.yaml"));
+});
+
+app.get("/docs/onboarding", (_req, res) => {
+  res.redirect("https://github.com/emirsimsek00/ai-pr-risk-gate/blob/main/docs/ONBOARDING.md");
+});
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "ai-pr-risk-gate" });
 });

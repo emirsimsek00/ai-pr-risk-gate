@@ -9,6 +9,9 @@
     :root{--bg:#f6f3ee;--card:#fffcf7;--text:#1f1a17;--muted:#6f665f;--line:#e8dfd3;--blue:#8b6a3f;--green:#2f6b4f;--amber:#9a6a2a;--red:#8a3c36}
     *{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:Manrope,system-ui,sans-serif;color:var(--text)}
     .wrap{max-width:1180px;margin:40px auto;padding:0 24px}
+    .nav{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+    .nav a{text-decoration:none;color:var(--text);border:1px solid var(--line);background:var(--card);padding:8px 12px;border-radius:999px;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+    .nav a.active{background:var(--blue);color:#fff;border-color:var(--blue)}
     .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:12px;flex-wrap:wrap}
     .title{font-size:30px;font-weight:600;font-family:"Cormorant Garamond",Georgia,serif;letter-spacing:.2px;line-height:1.1}
     .toolbar{display:flex;gap:8px;align-items:center}
@@ -29,6 +32,12 @@
 </head>
 <body>
   <div class="wrap">
+    <nav class="nav" aria-label="Primary">
+      <a href="/">Analyzer</a>
+      <a class="active" href="/dashboard">Dashboard</a>
+      <a href="/openapi.yaml" target="_blank" rel="noreferrer">API Spec</a>
+      <a href="/docs/onboarding" target="_blank" rel="noreferrer">Onboarding</a>
+    </nav>
     <div class="top">
       <div class="title">AI PR Risk Gate Dashboard</div>
       <div class="toolbar">
