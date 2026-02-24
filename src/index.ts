@@ -16,10 +16,11 @@ import { fetchPullRequestFiles } from "./githubApi.js";
 import { evaluatePolicy } from "./policy.js";
 import type { ChangedFile } from "./types.js";
 
-const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, "..", "public");
+
+export const app = express();
 
 // Lightweight in-memory limiter for public API routes.
 const hits = new Map<string, { count: number; resetAt: number }>();
@@ -253,5 +254,7 @@ app.post("/webhook/github", async (req, res) => {
   }
 });
 
-const port = Number(process.env.PORT || 8787);
-app.listen(port, () => console.log(`ai-pr-risk-gate listening on :${port}`));
+if (process.env.NODE_ENV !== "test") {
+  const port = Number(process.env.PORT || 8787);
+  app.listen(port, () => console.log(`ai-pr-risk-gate listening on :${port}`));
+}

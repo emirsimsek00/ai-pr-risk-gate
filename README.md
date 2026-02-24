@@ -137,5 +137,13 @@ Examples:
 - Add threshold policies per repo/team
 - Add trend dashboard (risk over time by repo/team)
 
+## Architecture
+- Diagram + request flow: `docs/ARCHITECTURE.md`
+
+## Resume-ready bullets
+- Built an AI PR Risk Gate service (Node.js/TypeScript/Postgres) that scores pull request risk and enforces configurable policy thresholds before merge.
+- Implemented webhook + CI ingestion paths, structured request logging, and analytics endpoints powering a professional dashboard for risk trends and recurring findings.
+- Added CI quality gates with automated tests and coverage thresholds to improve release safety and maintainability.
+
 ## License
 MIT
