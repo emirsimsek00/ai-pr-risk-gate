@@ -140,6 +140,14 @@ Examples:
 ## Architecture
 - Diagram + request flow: `docs/ARCHITECTURE.md`
 
+## API contract and tooling
+- OpenAPI spec: `openapi.yaml`
+- Postman collection: `postman_collection.json`
+
+## Operations
+- Runbook: `docs/RUNBOOK.md`
+- Release notes: `CHANGELOG.md`
+
 ## Resume-ready bullets
 - Built an AI PR Risk Gate service (Node.js/TypeScript/Postgres) that scores pull request risk and enforces configurable policy thresholds before merge.
 - Implemented webhook + CI ingestion paths, structured request logging, and analytics endpoints powering a professional dashboard for risk trends and recurring findings.

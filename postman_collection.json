@@ -1,0 +1,46 @@
+{
+  "info": {
+    "name": "AI PR Risk Gate",
+    "_postman_id": "6b5cd8c9-2615-44d9-a528-7d5a7d1d1c16",
+    "description": "Core API collection for AI PR Risk Gate",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://ai-pr-risk-gate.onrender.com" },
+    { "key": "repo", "value": "ai-pr-risk-gate" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+    },
+    {
+      "name": "Analyze",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"repo\": \"{{repo}}\",\n  \"prNumber\": 1,\n  \"files\": [\n    {\n      \"filename\": \"src/auth/jwt.ts\",\n      \"patch\": \"+ const token = sign(payload, secret)\"\n    }\n  ]\n}"
+        },
+        "url": "{{baseUrl}}/api/analyze"
+      }
+    },
+    {
+      "name": "Trends",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/trends?days=30&repo={{repo}}" }
+    },
+    {
+      "name": "Recent",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/recent?limit=20&repo={{repo}}" }
+    },
+    {
+      "name": "Severity",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/severity?days=30&repo={{repo}}" }
+    },
+    {
+      "name": "Findings",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/findings?days=30&repo={{repo}}" }
+    }
+  ]
+}

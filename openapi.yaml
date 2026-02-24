@@ -1,0 +1,157 @@
+openapi: 3.1.0
+info:
+  title: AI PR Risk Gate API
+  version: 1.0.0
+  description: |
+    Risk scoring and policy-gating API for pull requests.
+servers:
+  - url: https://ai-pr-risk-gate.onrender.com
+  - url: http://localhost:8787
+tags:
+  - name: Health
+  - name: Analysis
+  - name: Analytics
+  - name: Webhooks
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Service health check
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  service: { type: string }
+  /api/analyze:
+    post:
+      tags: [Analysis]
+      summary: Analyze PR changes and apply policy gate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+      responses:
+        '200':
+          description: Analysis complete, policy allows
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnalyzeResponse' }
+        '409':
+          description: Analysis complete, policy blocks
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnalyzeResponse' }
+        '400':
+          description: Invalid payload
+  /api/trends:
+    get:
+      tags: [Analytics]
+      summary: Daily trend of average risk score
+      parameters:
+        - in: query
+          name: repo
+          schema: { type: string }
+        - in: query
+          name: days
+          schema: { type: integer, minimum: 1, maximum: 365, default: 30 }
+      responses:
+        '200':
+          description: Trend data
+  /api/recent:
+    get:
+      tags: [Analytics]
+      summary: Most recent assessments
+      parameters:
+        - in: query
+          name: repo
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Recent rows
+  /api/severity:
+    get:
+      tags: [Analytics]
+      summary: Severity distribution over date range
+      parameters:
+        - in: query
+          name: repo
+          schema: { type: string }
+        - in: query
+          name: days
+          schema: { type: integer, minimum: 1, maximum: 365, default: 30 }
+      responses:
+        '200':
+          description: Severity counts
+  /api/findings:
+    get:
+      tags: [Analytics]
+      summary: Top recurring findings over date range
+      parameters:
+        - in: query
+          name: repo
+          schema: { type: string }
+        - in: query
+          name: days
+          schema: { type: integer, minimum: 1, maximum: 365, default: 30 }
+      responses:
+        '200':
+          description: Finding counts
+  /webhook/github:
+    post:
+      tags: [Webhooks]
+      summary: GitHub pull_request webhook endpoint
+      description: Validates X-Hub-Signature-256, fetches PR files, analyzes risk, comments on PR.
+      parameters:
+        - in: header
+          name: X-Hub-Signature-256
+          required: false
+          schema: { type: string }
+      responses:
+        '202': { description: Accepted / analysis complete and allowed }
+        '409': { description: Analysis complete and blocked by policy }
+        '401': { description: Invalid signature }
+components:
+  schemas:
+    ChangedFile:
+      type: object
+      required: [filename]
+      properties:
+        filename: { type: string }
+        status: { type: string }
+        patch: { type: string }
+    AnalyzeRequest:
+      type: object
+      required: [repo, prNumber, files]
+      properties:
+        repo: { type: string }
+        owner: { type: string }
+        prNumber: { type: integer }
+        files:
+          type: array
+          items: { $ref: '#/components/schemas/ChangedFile' }
+    AnalyzeResponse:
+      type: object
+      properties:
+        score: { type: integer }
+        severity: { type: string, enum: [low, medium, high, critical] }
+        findings:
+          type: array
+          items: { type: string }
+        recommendations:
+          type: array
+          items: { type: string }
+        policy:
+          type: object
+          properties:
+            allowed: { type: boolean }
+            reason: { type: string }
