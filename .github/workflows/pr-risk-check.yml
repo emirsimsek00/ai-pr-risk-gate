@@ -1,0 +1,45 @@
+name: PR Risk Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  risk-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Gather changed files
+        id: files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files > files.json
+          jq '[.[] | {filename, status, patch}]' files.json > payload-files.json
+
+      - name: Call Risk Gate
+        env:
+          RISK_GATE_URL: ${{ secrets.RISK_GATE_URL }}
+        run: |
+          jq -n \
+            --arg owner "${{ github.repository_owner }}" \
+            --arg repo "${{ github.event.repository.name }}" \
+            --argjson pr ${{ github.event.pull_request.number }} \
+            --slurpfile files payload-files.json \
+            '{owner:$owner, repo:$repo, prNumber:$pr, files:$files[0]}' > request.json
+
+          curl -sS -X POST "$RISK_GATE_URL/analyze" \
+            -H 'content-type: application/json' \
+            --data @request.json > response.json
+
+          cat response.json
+
+      - name: Fail on critical score
+        run: |
+          SCORE=$(jq -r '.score // 0' response.json)
+          if [ "$SCORE" -ge 80 ]; then
+            echo "Critical risk score: $SCORE"
+            exit 1
+          fi
