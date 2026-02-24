@@ -25,7 +25,9 @@ Backend service that scores pull requests for operational/security risk before m
 - Optional PR comment posting via GitHub API
 - Assessment persistence to Postgres
 - Demo UI at `/` for recruiter-friendly live walkthroughs
-- Professional metrics dashboard at `/dashboard`
+- Professional metrics dashboard at `/dashboard` (repo filter + trend visuals)
+- Structured JSON request logging with request IDs
+- In-memory API rate limiting guardrails
 
 ## Quick start (local)
 ```bash
@@ -112,9 +114,11 @@ Override with env var:
 RISK_POLICIES_JSON='[{"repo":"ai-pr-risk-gate","blockAtOrAbove":"high"},{"repo":"*","blockAtOrAbove":"critical"}]'
 ```
 
-## Trends endpoint
-- `GET /api/trends?repo=<name>&days=30`
-- Returns daily average risk score + volume
+## Analytics endpoints
+- `GET /api/trends?repo=<name>&days=30` → daily average risk score + volume
+- `GET /api/recent?repo=<name>&limit=20` → recent assessment records
+- `GET /api/severity?repo=<name>&days=30` → severity distribution
+- `GET /api/findings?repo=<name>&days=30` → top recurring findings
 
 ## Autonomous operations toolkit
 Scripts in `ops/`:
