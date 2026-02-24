@@ -145,6 +145,7 @@ Examples:
 - Postman collection: `postman_collection.json`
 
 ## Operations
+- Onboarding guide: `docs/ONBOARDING.md`
 - Runbook: `docs/RUNBOOK.md`
 - Release notes: `CHANGELOG.md`
 
