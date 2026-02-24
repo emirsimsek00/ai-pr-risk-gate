@@ -16,6 +16,19 @@ function validSignature(payload: Buffer, signatureHeader?: string) {
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
 }
 
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: "ai-pr-risk-gate",
+    message: "Service is running",
+    endpoints: {
+      health: "GET /health",
+      analyze: "POST /analyze",
+      githubWebhook: "POST /webhook/github"
+    }
+  });
+});
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "ai-pr-risk-gate" });
 });
