@@ -34,11 +34,23 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use((_req, res, next) => {
+app.use((req, res, next) => {
   res.setHeader("x-content-type-options", "nosniff");
   res.setHeader("x-frame-options", "DENY");
   res.setHeader("referrer-policy", "no-referrer");
   res.setHeader("x-xss-protection", "0");
+
+  if (corsOrigins.length > 0) {
+    const origin = req.header("origin");
+    if (origin && corsOrigins.includes(origin)) {
+      res.setHeader("access-control-allow-origin", origin);
+      res.setHeader("vary", "origin");
+      res.setHeader("access-control-allow-headers", "content-type, authorization, x-api-key");
+      res.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
+    }
+  }
+
+  if (req.method === "OPTIONS") return res.status(204).end();
   next();
 });
 
@@ -82,6 +94,25 @@ const MAX_PATCH_LENGTH = Number(process.env.MAX_PATCH_LENGTH ?? 200_000);
 const REPO_NAME_PATTERN = /^[A-Za-z0-9._-]{1,100}$/;
 const OWNER_NAME_PATTERN = /^[A-Za-z0-9._-]{1,100}$/;
 
+type ApiRole = "read" | "write";
+type ApiKeyConfig = { key: string; role: ApiRole; repos?: string[] };
+
+const apiKeys = (() => {
+  const raw = process.env.API_KEYS_JSON;
+  if (!raw) return [] as ApiKeyConfig[];
+  try {
+    const parsed = JSON.parse(raw) as ApiKeyConfig[];
+    return parsed.filter((k) => k && typeof k.key === "string" && (k.role === "read" || k.role === "write"));
+  } catch {
+    return [] as ApiKeyConfig[];
+  }
+})();
+
+const corsOrigins = (process.env.CORS_ORIGINS ?? "")
+  .split(",")
+  .map((v) => v.trim())
+  .filter(Boolean);
+
 function logEvent(level: "info" | "error", req: express.Request, message: string, extra?: Record<string, unknown>) {
   const payload = {
     ts: new Date().toISOString(),
@@ -107,6 +138,62 @@ function asyncHandler(fn: AsyncRoute) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     fn(req, res, next).catch(next);
   };
+}
+
+function extractApiKey(req: express.Request) {
+  const headerKey = req.header("x-api-key");
+  if (headerKey) return headerKey;
+
+  const auth = req.header("authorization");
+  if (auth?.startsWith("Bearer ")) return auth.slice(7).trim();
+
+  return undefined;
+}
+
+function canAccessRepo(config: ApiKeyConfig, repo?: string) {
+  if (!config.repos || config.repos.length === 0 || config.repos.includes("*")) return true;
+  if (!repo) return true;
+  return config.repos.includes(repo);
+}
+
+function requireApiRole(role: ApiRole) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (apiKeys.length === 0) return next();
+
+    const token = extractApiKey(req);
+    if (!token) return res.status(401).json({ error: "missing API key" });
+
+    const key = apiKeys.find((k) => k.key === token);
+    if (!key) return res.status(401).json({ error: "invalid API key" });
+
+    if (role === "write" && key.role !== "write") return res.status(403).json({ error: "write access required" });
+
+    const repoFromBody = typeof (req.body as { repo?: unknown })?.repo === "string" ? (req.body as { repo: string }).repo : undefined;
+    const repoFromQuery = typeof req.query.repo === "string" ? req.query.repo : undefined;
+    const repo = repoFromBody ?? repoFromQuery;
+
+    if (!canAccessRepo(key, repo)) return res.status(403).json({ error: "repo access denied" });
+
+    return next();
+  };
+}
+
+function requireWebhookAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (apiKeys.length === 0) return next();
+
+  const token = extractApiKey(req);
+  if (token) {
+    const key = apiKeys.find((k) => k.key === token);
+    if (key?.role === "write") return next();
+  }
+
+  const rawBody = (req as express.Request & { rawBody?: Buffer }).rawBody;
+  const sig = req.header("x-hub-signature-256") || undefined;
+  const secretConfigured = Boolean(process.env.GITHUB_WEBHOOK_SECRET);
+
+  if (secretConfigured && rawBody && validSignature(rawBody, sig)) return next();
+
+  return res.status(401).json({ error: "webhook auth required" });
 }
 
 function validSignature(payload: Buffer, signatureHeader?: string) {
@@ -230,7 +317,7 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "ai-pr-risk-gate" });
 });
 
-app.get("/api/trends", asyncHandler(async (req, res) => {
+app.get("/api/trends", requireApiRole("read"), asyncHandler(async (req, res) => {
   const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;
   const days = typeof req.query.days === "string" ? Number(req.query.days) : 30;
   const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
@@ -238,7 +325,7 @@ app.get("/api/trends", asyncHandler(async (req, res) => {
   return res.json({ repo: repo ?? "all", days: safeDays, trends });
 }));
 
-app.get("/api/recent", asyncHandler(async (req, res) => {
+app.get("/api/recent", requireApiRole("read"), asyncHandler(async (req, res) => {
   const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;
   const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 20;
   const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 100)) : 20;
@@ -246,7 +333,7 @@ app.get("/api/recent", asyncHandler(async (req, res) => {
   return res.json({ limit: safeLimit, rows });
 }));
 
-app.get("/api/severity", asyncHandler(async (req, res) => {
+app.get("/api/severity", requireApiRole("read"), asyncHandler(async (req, res) => {
   const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;
   const days = typeof req.query.days === "string" ? Number(req.query.days) : 30;
   const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
@@ -254,7 +341,7 @@ app.get("/api/severity", asyncHandler(async (req, res) => {
   return res.json({ repo: repo ?? "all", days: safeDays, rows });
 }));
 
-app.get("/api/findings", asyncHandler(async (req, res) => {
+app.get("/api/findings", requireApiRole("read"), asyncHandler(async (req, res) => {
   const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;
   const days = typeof req.query.days === "string" ? Number(req.query.days) : 30;
   const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
@@ -294,10 +381,10 @@ const analyzeHandler = async (req: express.Request, res: express.Response) => {
   return res.status(policy.allowed ? 200 : 409).json({ ...result, policy });
 };
 
-app.post("/analyze", asyncHandler(analyzeHandler));
-app.post("/api/analyze", asyncHandler(analyzeHandler));
+app.post("/analyze", requireApiRole("write"), asyncHandler(analyzeHandler));
+app.post("/api/analyze", requireApiRole("write"), asyncHandler(analyzeHandler));
 
-app.post("/webhook/github", asyncHandler(async (req, res) => {
+app.post("/webhook/github", requireWebhookAccess, asyncHandler(async (req, res) => {
   try {
     const rawBody = (req as express.Request & { rawBody?: Buffer }).rawBody;
     if (!rawBody) {

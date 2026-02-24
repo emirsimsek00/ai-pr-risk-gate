@@ -1,4 +1,4 @@
-# AI PR Risk Gate (MVP)
+# AI PR Risk Gate
 
 Backend service that scores pull requests for operational/security risk before merge.
 
@@ -44,6 +44,32 @@ curl http://localhost:8787/health
 Open demo UI:
 ```bash
 open http://localhost:8787/
+```
+
+## Authentication & CORS (Sprint 1)
+By default, API key auth is disabled (no keys configured).
+
+Enable role-based API keys:
+```bash
+API_KEYS_JSON='[{"key":"read-key","role":"read"},{"key":"write-key","role":"write"}]'
+```
+
+Use either header:
+- `x-api-key: <key>`
+- `Authorization: Bearer <key>`
+
+Role behavior:
+- `read` key: `GET /api/*`
+- `write` key: analyze + webhook endpoints
+
+Optional repo scoping:
+```bash
+API_KEYS_JSON='[{"key":"team-a-write","role":"write","repos":["repo-a"]}]'
+```
+
+Optional CORS allowlist:
+```bash
+CORS_ORIGINS='https://example.com,https://dashboard.example.com'
 ```
 
 ## DB setup
@@ -147,6 +173,7 @@ Examples:
 ## Operations
 - Onboarding guide: `docs/ONBOARDING.md`
 - Runbook: `docs/RUNBOOK.md`
+- Security policy: `SECURITY.md`
 - Release notes: `CHANGELOG.md`
 
 ## Resume-ready bullets

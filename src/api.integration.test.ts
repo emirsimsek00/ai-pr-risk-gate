@@ -11,6 +11,7 @@ describe("api integration", () => {
     expect(res.headers["x-frame-options"]).toBe("DENY");
   });
 
+
   it("validates analyze payload", async () => {
     const res = await request(app).post("/api/analyze").send({ repo: "x" });
     expect(res.status).toBe(400);
