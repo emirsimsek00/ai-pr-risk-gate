@@ -46,3 +46,36 @@ export async function getRiskTrends(repo?: string, days = 30) {
   const result = await db.query(query, params);
   return result.rows as Array<{ day: string; avgScore: number; count: number }>;
 }
+
+export async function getRecentAssessments(limit = 20) {
+  if (!db) {
+    return [] as Array<{
+      id: number;
+      repo: string;
+      pr_number: number;
+      score: number;
+      severity: string;
+      findings: unknown;
+      created_at: string;
+    }>;
+  }
+
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  const result = await db.query(
+    `select id, repo, pr_number, score, severity, findings, created_at
+     from risk_assessments
+     order by created_at desc
+     limit $1`,
+    [safeLimit]
+  );
+
+  return result.rows as Array<{
+    id: number;
+    repo: string;
+    pr_number: number;
+    score: number;
+    severity: string;
+    findings: unknown;
+    created_at: string;
+  }>;
+}

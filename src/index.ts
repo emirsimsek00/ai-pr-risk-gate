@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { evaluateRisk } from "./riskEngine.js";
-import { getRiskTrends, saveAssessment } from "./db.js";
+import { getRecentAssessments, getRiskTrends, saveAssessment } from "./db.js";
 import { formatComment, postPRComment } from "./github.js";
 import { fetchPullRequestFiles } from "./githubApi.js";
 import { evaluatePolicy } from "./policy.js";
@@ -67,6 +67,10 @@ app.get("/", (_req, res) => {
   res.sendFile(path.join(publicDir, "index.html"));
 });
 
+app.get("/dashboard", (_req, res) => {
+  res.sendFile(path.join(publicDir, "dashboard.html"));
+});
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "ai-pr-risk-gate" });
 });
@@ -78,6 +82,13 @@ app.get("/api/trends", async (req, res) => {
   const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
   const trends = await getRiskTrends(repo, safeDays);
   return res.json({ repo: repo ?? "all", days: safeDays, trends });
+});
+
+app.get("/api/recent", async (req, res) => {
+  const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 20;
+  const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 100)) : 20;
+  const rows = await getRecentAssessments(safeLimit);
+  return res.json({ limit: safeLimit, rows });
 });
 
 const analyzeHandler = async (req: express.Request, res: express.Response) => {

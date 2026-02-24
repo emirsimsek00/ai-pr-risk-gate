@@ -25,6 +25,7 @@ Backend service that scores pull requests for operational/security risk before m
 - Optional PR comment posting via GitHub API
 - Assessment persistence to Postgres
 - Demo UI at `/` for recruiter-friendly live walkthroughs
+- Professional metrics dashboard at `/dashboard`
 
 ## Quick start (local)
 ```bash
@@ -74,7 +75,9 @@ Response:
 ```
 
 ## GitHub integration
-Workflow file: `.github/workflows/pr-risk-check.yml`
+Workflows:
+- `.github/workflows/pr-risk-check.yml` (risk scoring on PR changes)
+- `.github/workflows/ci.yml` (build + tests)
 
 Webhook endpoint:
 - `POST /webhook/github` (supports `opened`, `synchronize`, `reopened` PR events)

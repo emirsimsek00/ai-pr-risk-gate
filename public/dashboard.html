@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI PR Risk Gate • Dashboard</title>
+  <style>
+    :root{--bg:#f6f8fb;--card:#fff;--text:#121826;--muted:#64748b;--line:#e5e7eb;--accent:#2563eb}
+    body{margin:0;background:var(--bg);font-family:Inter,system-ui,sans-serif;color:var(--text)}
+    .wrap{max-width:1100px;margin:28px auto;padding:0 16px}
+    .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+    .title{font-size:22px;font-weight:700}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+    .k{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+    .v{font-size:24px;font-weight:700;margin-top:6px}
+    .main{display:grid;grid-template-columns:2fr 1.2fr;gap:12px}
+    table{width:100%;border-collapse:collapse}
+    th,td{font-size:13px;padding:10px;border-bottom:1px solid var(--line);text-align:left}
+    th{color:var(--muted);font-weight:600}
+    .sev{font-weight:700}
+    .sev.low{color:#15803d}.sev.medium{color:#b45309}.sev.high,.sev.critical{color:#b91c1c}
+    @media(max-width:980px){.grid{grid-template-columns:repeat(2,1fr)}.main{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="title">AI PR Risk Gate Dashboard</div>
+      <a href="/" style="color:var(--accent);text-decoration:none">Open Analyzer</a>
+    </div>
+
+    <div class="grid">
+      <div class="card"><div class="k">Assessments (30d)</div><div class="v" id="total">—</div></div>
+      <div class="card"><div class="k">Average Score</div><div class="v" id="avg">—</div></div>
+      <div class="card"><div class="k">Latest Severity</div><div class="v" id="latest">—</div></div>
+      <div class="card"><div class="k">High/Critical</div><div class="v" id="critical">—</div></div>
+    </div>
+
+    <div class="main">
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:8px">Recent Assessments</div>
+        <table>
+          <thead><tr><th>Time</th><th>Repo</th><th>PR</th><th>Score</th><th>Severity</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:8px">30-Day Daily Trend</div>
+        <table>
+          <thead><tr><th>Day</th><th>Avg Score</th><th>Count</th></tr></thead>
+          <tbody id="trend"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+async function load(){
+  const [recent, trends] = await Promise.all([
+    fetch('/api/recent?limit=20').then(r=>r.json()),
+    fetch('/api/trends?days=30').then(r=>r.json())
+  ]);
+
+  const rows = recent.rows || [];
+  const total = rows.length;
+  const avg = total ? (rows.reduce((a,r)=>a+r.score,0)/total).toFixed(1) : '0.0';
+  const latest = rows[0]?.severity || 'n/a';
+  const critical = rows.filter(r=>['high','critical'].includes(r.severity)).length;
+
+  document.getElementById('total').textContent = String(total);
+  document.getElementById('avg').textContent = String(avg);
+  document.getElementById('latest').innerHTML = `<span class="sev ${latest}">${String(latest).toUpperCase()}</span>`;
+  document.getElementById('critical').textContent = String(critical);
+
+  document.getElementById('rows').innerHTML = rows.map(r=>`
+    <tr>
+      <td>${new Date(r.created_at).toLocaleString()}</td>
+      <td>${r.repo}</td>
+      <td>#${r.pr_number}</td>
+      <td>${r.score}</td>
+      <td class="sev ${r.severity}">${r.severity.toUpperCase()}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5">No data yet.</td></tr>';
+
+  const trendRows = trends.trends || [];
+  document.getElementById('trend').innerHTML = trendRows.map(t=>`
+    <tr><td>${t.day}</td><td>${t.avgScore}</td><td>${t.count}</td></tr>
+  `).join('') || '<tr><td colspan="3">No trend data yet.</td></tr>';
+}
+load();
+</script>
+</body>
+</html>
