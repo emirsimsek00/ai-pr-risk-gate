@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: ai-pr-risk-gate
+    env: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
