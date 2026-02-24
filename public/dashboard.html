@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI PR Risk Gate • Dashboard</title>
+  <link rel="stylesheet" href="/theme.css" />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Cormorant+Garamond:wght@500;600&display=swap');
-    :root{--bg:#f6f3ee;--card:#fffcf7;--text:#1f1a17;--muted:#6f665f;--line:#e8dfd3;--blue:#8b6a3f;--green:#2f6b4f;--amber:#9a6a2a;--red:#8a3c36}
     *{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:Manrope,system-ui,sans-serif;color:var(--text)}
     .wrap{max-width:1180px;margin:40px auto;padding:0 24px}
     .nav{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
     .nav a{text-decoration:none;color:var(--text);border:1px solid var(--line);background:var(--card);padding:8px 12px;border-radius:999px;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
-    .nav a.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .nav a.active{background:var(--accent);color:#fff;border-color:var(--accent)}
     .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:12px;flex-wrap:wrap}
     .title{font-size:30px;font-weight:600;font-family:"Cormorant Garamond",Georgia,serif;letter-spacing:.2px;line-height:1.1}
     .toolbar{display:flex;gap:8px;align-items:center}
@@ -22,9 +22,9 @@
     .main{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;margin-bottom:16px}
     .sub{display:grid;grid-template-columns:1fr 1fr;gap:16px}
     table{width:100%;border-collapse:collapse} th,td{font-size:13px;padding:11px 10px;border-bottom:1px solid var(--line);text-align:left} th{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:11px}
-    .sev{font-weight:700}.sev.low{color:var(--green)}.sev.medium{color:var(--amber)}.sev.high,.sev.critical{color:var(--red)}
+    .sev{font-weight:700}.sev.low{color:var(--good)}.sev.medium{color:var(--warn)}.sev.high,.sev.critical{color:var(--bad)}
     .chart{height:220px;display:flex;align-items:flex-end;gap:6px;border-top:1px solid var(--line);padding-top:8px}
-    .bar{flex:1;background:linear-gradient(180deg,#60a5fa,var(--blue));border-radius:6px 6px 0 0;min-width:8px;position:relative}
+    .bar{flex:1;background:linear-gradient(180deg,#bea382,var(--accent));border-radius:6px 6px 0 0;min-width:8px;position:relative}
     .bar span{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);white-space:nowrap;margin-bottom:4px}
     .legend{display:flex;gap:10px;font-size:12px;color:var(--muted);margin-top:8px}.dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:4px}
     @media(max-width:1020px){.grid{grid-template-columns:repeat(2,1fr)}.main{grid-template-columns:1fr}.sub{grid-template-columns:1fr}}
@@ -43,7 +43,7 @@
       <div class="toolbar">
         <input id="repo" placeholder="repo filter (optional)" />
         <select id="days"><option value="7">7d</option><option value="30" selected>30d</option><option value="90">90d</option></select>
-        <button id="apply" style="border:0;background:var(--blue);color:#fff;border-radius:8px;padding:9px 12px;cursor:pointer">Apply</button>
+        <button id="apply" style="border:0;background:var(--accent);color:#fff;border-radius:8px;padding:9px 12px;cursor:pointer">Apply</button>
       </div>
     </div>
 
@@ -82,7 +82,7 @@ async function fetchJson(url){const r=await fetch(url);return r.json();}
 
 function renderChart(rows){
   const chart=document.getElementById('chart');
-  if(!rows.length){chart.innerHTML='<div style="color:#64748b">No trend data yet.</div>';return;}
+  if(!rows.length){chart.innerHTML='<div style="color:var(--muted)">No trend data yet.</div>';return;}
   const max=Math.max(...rows.map(r=>Number(r.avgScore)||0),1);
   chart.innerHTML=rows.map(r=>{
     const h=Math.max(8,Math.round(((Number(r.avgScore)||0)/max)*180));

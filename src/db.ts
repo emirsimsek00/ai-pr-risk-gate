@@ -2,22 +2,49 @@ import { Pool, type QueryResult } from "pg";
 
 const connectionString = process.env.DATABASE_URL;
 const DB_QUERY_TIMEOUT_MS = Number(process.env.DB_QUERY_TIMEOUT_MS ?? 3000);
+const DB_QUERY_RETRY_ATTEMPTS = Number(process.env.DB_QUERY_RETRY_ATTEMPTS ?? 2);
+const DB_QUERY_RETRY_BASE_MS = Number(process.env.DB_QUERY_RETRY_BASE_MS ?? 120);
 
 export const db = connectionString
   ? new Pool({ connectionString })
   : null;
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetriableDbError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const code = (error as Error & { code?: string }).code;
+  if (!code) return false;
+  return ["40001", "40P01", "53300", "08000", "08003", "08006"].includes(code);
+}
+
 async function queryWithTimeout(query: string, params: Array<string | number>): Promise<QueryResult> {
   if (!db) throw new Error("database is not configured");
 
-  const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(`db query timeout after ${DB_QUERY_TIMEOUT_MS}ms`)), DB_QUERY_TIMEOUT_MS);
-  });
+  let lastError: unknown;
 
-  return Promise.race([
-    db.query(query, params),
-    timeout
-  ]) as Promise<QueryResult>;
+  for (let attempt = 1; attempt <= DB_QUERY_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      const timeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error(`db query timeout after ${DB_QUERY_TIMEOUT_MS}ms`)), DB_QUERY_TIMEOUT_MS);
+      });
+
+      return await Promise.race([
+        db.query(query, params),
+        timeout
+      ]) as QueryResult;
+    } catch (error) {
+      lastError = error;
+      if (!isRetriableDbError(error) || attempt === DB_QUERY_RETRY_ATTEMPTS) {
+        throw error;
+      }
+      await sleep(DB_QUERY_RETRY_BASE_MS * 2 ** (attempt - 1));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("db query failed");
 }
 
 export async function saveAssessment(input: {

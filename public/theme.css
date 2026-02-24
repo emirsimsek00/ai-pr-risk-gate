@@ -1,0 +1,14 @@
+:root {
+  --bg: #f6f3ee;
+  --card: #fffcf7;
+  --text: #1f1a17;
+  --muted: #6f665f;
+  --accent: #8b6a3f;
+  --line: #e8dfd3;
+  --good: #2f6b4f;
+  --warn: #9a6a2a;
+  --bad: #8a3c36;
+  --good-bg: #eaf4ef;
+  --warn-bg: #f8efe3;
+  --bad-bg: #f8e8e6;
+}

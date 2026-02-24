@@ -45,4 +45,18 @@ describe("api integration", () => {
     process.env.GITHUB_WEBHOOK_SECRET = previous;
     expect(res.status).toBe(401);
   });
+
+  it("ignores non pull_request webhook events", async () => {
+    const previous = process.env.GITHUB_WEBHOOK_SECRET;
+    delete process.env.GITHUB_WEBHOOK_SECRET;
+
+    const res = await request(app)
+      .post("/webhook/github")
+      .set("x-github-event", "issues")
+      .send({ action: "opened" });
+
+    process.env.GITHUB_WEBHOOK_SECRET = previous;
+    expect(res.status).toBe(200);
+    expect(res.text).toBe("ignored");
+  });
 });

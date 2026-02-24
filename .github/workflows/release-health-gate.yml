@@ -1,0 +1,43 @@
+name: Release Health Gate
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+jobs:
+  post-deploy-health:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wait for Render deploy window
+        run: sleep 45
+
+      - name: Smoke check health endpoint
+        env:
+          RISK_GATE_URL: ${{ secrets.RISK_GATE_URL }}
+        run: |
+          if [ -z "$RISK_GATE_URL" ]; then
+            echo "RISK_GATE_URL is required"
+            exit 1
+          fi
+
+          code=$(curl -sS -o health.json -w '%{http_code}' "$RISK_GATE_URL/health")
+          cat health.json
+          test "$code" = "200"
+          grep -q '"ok":true' health.json
+
+      - name: Smoke check root page
+        env:
+          RISK_GATE_URL: ${{ secrets.RISK_GATE_URL }}
+        run: |
+          code=$(curl -sS -o /tmp/root.html -w '%{http_code}' "$RISK_GATE_URL/")
+          test "$code" = "200"
+          grep -q "AI PR Risk Gate" /tmp/root.html
+
+      - name: Rollback hook hint
+        if: failure()
+        run: |
+          echo "Post-deploy smoke failed. Trigger rollback via your Render dashboard or render CLI rollback command."
+          exit 1

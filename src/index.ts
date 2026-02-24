@@ -140,6 +140,29 @@ function validateAnalyzeRequest(body: AnalyzeRequest) {
   return null;
 }
 
+type WebhookPRContext = { action: "opened" | "synchronize" | "reopened"; owner: string; repo: string; prNumber: number };
+
+function parseWebhookPRContext(payload: unknown): WebhookPRContext | null {
+  if (!payload || typeof payload !== "object") return null;
+
+  const maybeAction = (payload as { action?: unknown }).action;
+  const pr = (payload as { pull_request?: { number?: unknown } }).pull_request;
+  const repository = (payload as { repository?: { name?: unknown; owner?: { login?: unknown } } }).repository;
+
+  if (!["opened", "synchronize", "reopened"].includes(String(maybeAction ?? ""))) return null;
+
+  const action = maybeAction as WebhookPRContext["action"];
+  const prNumber = pr?.number;
+  const repo = repository?.name;
+  const owner = repository?.owner?.login;
+
+  if (!Number.isInteger(prNumber) || typeof repo !== "string" || repo.length === 0 || typeof owner !== "string" || owner.length === 0) {
+    return null;
+  }
+
+  return { action, owner, repo, prNumber: Number(prNumber) };
+}
+
 async function runRiskAssessment(input: AnalyzeRequest) {
   const result = evaluateRisk(input.files);
   const policy = evaluatePolicy(input.repo, result.severity);
@@ -255,16 +278,19 @@ app.post("/webhook/github", asyncHandler(async (req, res) => {
       return res.status(401).send("invalid signature");
     }
 
-    const payload = JSON.parse(rawBody.toString("utf8"));
-    const action = payload?.action as string | undefined;
-    const prNumber = payload?.pull_request?.number as number | undefined;
-    const repo = payload?.repository?.name as string | undefined;
-    const owner = payload?.repository?.owner?.login as string | undefined;
-
-    if (!prNumber || !repo || !owner || !["opened", "synchronize", "reopened"].includes(action ?? "")) {
+    const eventName = req.header("x-github-event");
+    if (eventName !== "pull_request") {
       return res.status(200).send("ignored");
     }
 
+    const payload = JSON.parse(rawBody.toString("utf8"));
+    const context = parseWebhookPRContext(payload);
+
+    if (!context) {
+      return res.status(200).send("ignored");
+    }
+
+    const { owner, repo, prNumber } = context;
     const files = await fetchPullRequestFiles({ owner, repo, prNumber });
     const { result, policy } = await runRiskAssessment({ repo, owner, prNumber, files });
 
