@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI PR Risk Gate</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --card: #131a2a;
+        --text: #e8ecf4;
+        --muted: #a7b0c3;
+        --accent: #5ea1ff;
+        --good: #28c76f;
+        --warn: #ff9f43;
+        --bad: #ff5c5c;
+      }
+      body { font-family: Inter, system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+      .wrap { max-width: 920px; margin: 40px auto; padding: 0 16px; }
+      .card { background: var(--card); border-radius: 14px; padding: 20px; margin-bottom: 16px; box-shadow: 0 10px 28px rgba(0,0,0,.25); }
+      h1 { margin-top: 0; }
+      p { color: var(--muted); }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+      input, textarea { width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #2c3449; background: #0e1525; color: var(--text); padding: 10px; }
+      textarea { min-height: 120px; resize: vertical; }
+      button { margin-top: 12px; border: 0; border-radius: 9px; padding: 10px 14px; background: var(--accent); color: white; font-weight: 600; cursor: pointer; }
+      .pill { display: inline-block; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+      .low { background: #123d28; color: var(--good); }
+      .medium { background: #3d2c12; color: var(--warn); }
+      .high, .critical { background: #3d1212; color: var(--bad); }
+      ul { margin-top: 6px; }
+      code { background: #0d1423; border: 1px solid #2a3348; padding: 2px 6px; border-radius: 6px; }
+      @media (max-width: 760px){ .row { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>AI PR Risk Gate</h1>
+        <p>Interactive demo endpoint for your internship portfolio. Paste a sample PR diff and get a risk score.</p>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div>
+            <label>Repo</label>
+            <input id="repo" value="ai-pr-risk-gate" />
+          </div>
+          <div>
+            <label>PR Number</label>
+            <input id="pr" type="number" value="1" />
+          </div>
+        </div>
+
+        <label>Filename</label>
+        <input id="file" value="src/auth/jwt.ts" />
+
+        <label>Patch Snippet</label>
+        <textarea id="patch">+ const token = sign(payload, secret)</textarea>
+
+        <button id="run">Analyze Risk</button>
+      </div>
+
+      <div id="result" class="card" style="display:none;"></div>
+    </div>
+
+    <script>
+      const result = document.getElementById('result');
+      document.getElementById('run').addEventListener('click', async () => {
+        const payload = {
+          repo: document.getElementById('repo').value,
+          prNumber: Number(document.getElementById('pr').value),
+          files: [{ filename: document.getElementById('file').value, patch: document.getElementById('patch').value }]
+        };
+
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          result.style.display = 'block';
+          result.innerHTML = `<h3>Request failed</h3><p>${data.error || 'Unknown error'}</p>`;
+          return;
+        }
+
+        result.style.display = 'block';
+        result.innerHTML = `
+          <h3>Risk Score: ${data.score}/100</h3>
+          <p><span class="pill ${data.severity}">${data.severity.toUpperCase()}</span></p>
+          <h4>Findings</h4>
+          <ul>${data.findings.map(f => `<li>${f}</li>`).join('')}</ul>
+          <h4>Recommendations</h4>
+          <ul>${data.recommendations.map(r => `<li>${r}</li>`).join('')}</ul>
+        `;
+      });
+    </script>
+  </body>
+</html>

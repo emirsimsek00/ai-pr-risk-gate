@@ -23,6 +23,7 @@ Backend service that scores pull requests for operational/security risk before m
 - Findings + recommendations
 - Optional PR comment posting via GitHub API
 - Assessment persistence to Postgres
+- Demo UI at `/` for recruiter-friendly live walkthroughs
 
 ## Quick start (local)
 ```bash
@@ -34,6 +35,11 @@ npm run dev
 Health check:
 ```bash
 curl http://localhost:8787/health
+```
+
+Open demo UI:
+```bash
+open http://localhost:8787/
 ```
 
 ## DB setup
@@ -89,6 +95,17 @@ This repo includes `render.yaml`.
 2. GitHub Action runs risk check.
 3. PR shows score + findings comment.
 4. If score >= 80, check fails and blocks merge.
+
+## Autonomous operations toolkit
+Scripts in `ops/`:
+- `ops/healthcheck.sh` — verifies `/`, `/health`, and analyze smoke test
+- `ops/recover-openclaw.sh` — quick gateway sanity check + restart fallback
+
+Examples:
+```bash
+./ops/healthcheck.sh https://ai-pr-risk-gate.onrender.com
+./ops/recover-openclaw.sh
+```
 
 ## Next steps (v2)
 - Pull live PR file patches directly from GitHub API (no CI payload needed)
