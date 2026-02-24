@@ -3,9 +3,12 @@ import express from "express";
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { evaluateRisk, type ChangedFile } from "./riskEngine.js";
-import { saveAssessment } from "./db.js";
+import { evaluateRisk } from "./riskEngine.js";
+import { getRiskTrends, saveAssessment } from "./db.js";
 import { formatComment, postPRComment } from "./github.js";
+import { fetchPullRequestFiles } from "./githubApi.js";
+import { evaluatePolicy } from "./policy.js";
+import type { ChangedFile } from "./types.js";
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -44,6 +47,21 @@ function validateAnalyzeRequest(body: AnalyzeRequest) {
   return null;
 }
 
+async function runRiskAssessment(input: AnalyzeRequest) {
+  const result = evaluateRisk(input.files);
+  const policy = evaluatePolicy(input.repo, result.severity);
+
+  await saveAssessment({
+    repo: input.repo,
+    prNumber: input.prNumber,
+    score: result.score,
+    severity: result.severity,
+    findings: result.findings
+  });
+
+  return { result, policy };
+}
+
 // Human-friendly root page for demos/recruiters.
 app.get("/", (_req, res) => {
   res.sendFile(path.join(publicDir, "index.html"));
@@ -51,6 +69,15 @@ app.get("/", (_req, res) => {
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "ai-pr-risk-gate" });
+});
+
+app.get("/api/trends", async (req, res) => {
+  const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;
+  const days = typeof req.query.days === "string" ? Number(req.query.days) : 30;
+
+  const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
+  const trends = await getRiskTrends(repo, safeDays);
+  return res.json({ repo: repo ?? "all", days: safeDays, trends });
 });
 
 const analyzeHandler = async (req: express.Request, res: express.Response) => {
@@ -61,46 +88,59 @@ const analyzeHandler = async (req: express.Request, res: express.Response) => {
     return res.status(400).json({ error: validationError });
   }
 
-  const { repo, owner, prNumber, files } = payload;
-  const result = evaluateRisk(files);
-
-  await saveAssessment({
-    repo,
-    prNumber,
-    score: result.score,
-    severity: result.severity,
-    findings: result.findings
-  });
+  const { repo, owner, prNumber } = payload;
+  const { result, policy } = await runRiskAssessment(payload);
 
   // Optional PR comment posting is intentionally best-effort.
   if (owner) {
-    const body = formatComment(result.score, result.severity, result.findings, result.recommendations);
+    const body = [
+      formatComment(result.score, result.severity, result.findings, result.recommendations),
+      `\n- **Policy gate:** ${policy.allowed ? "ALLOW ✅" : `BLOCK ❌ (${policy.reason})`}`
+    ].join("\n");
+
     await postPRComment({ owner, repo, prNumber, body });
   }
 
-  return res.json(result);
+  return res.status(policy.allowed ? 200 : 409).json({ ...result, policy });
 };
 
 app.post("/analyze", analyzeHandler);
 app.post("/api/analyze", analyzeHandler);
 
-// GitHub webhook skeleton (v1): validates signature and accepts relevant PR events.
+// GitHub webhook v2: fetches PR files directly from GitHub API and performs assessment.
 app.post("/webhook/github", express.raw({ type: "application/json" }), async (req, res) => {
-  const sig = req.header("x-hub-signature-256") || undefined;
-  if (!validSignature(req.body as Buffer, sig)) {
-    return res.status(401).send("invalid signature");
+  try {
+    const sig = req.header("x-hub-signature-256") || undefined;
+    if (!validSignature(req.body as Buffer, sig)) {
+      return res.status(401).send("invalid signature");
+    }
+
+    const payload = JSON.parse((req.body as Buffer).toString("utf8"));
+    const action = payload?.action as string | undefined;
+    const prNumber = payload?.pull_request?.number as number | undefined;
+    const repo = payload?.repository?.name as string | undefined;
+    const owner = payload?.repository?.owner?.login as string | undefined;
+
+    if (!prNumber || !repo || !owner || !["opened", "synchronize", "reopened"].includes(action ?? "")) {
+      return res.status(200).send("ignored");
+    }
+
+    const files = await fetchPullRequestFiles({ owner, repo, prNumber });
+    const { result, policy } = await runRiskAssessment({ repo, owner, prNumber, files });
+
+    const body = [
+      formatComment(result.score, result.severity, result.findings, result.recommendations),
+      `\n- **Policy gate:** ${policy.allowed ? "ALLOW ✅" : `BLOCK ❌ (${policy.reason})`}`
+    ].join("\n");
+
+    await postPRComment({ owner, repo, prNumber, body });
+    return res.status(policy.allowed ? 202 : 409).json({ ...result, policy, source: "webhook" });
+  } catch (error) {
+    return res.status(500).json({
+      error: "webhook processing failed",
+      detail: error instanceof Error ? error.message : "unknown error"
+    });
   }
-
-  const payload = JSON.parse((req.body as Buffer).toString("utf8"));
-  const action = payload?.action;
-  const prNumber = payload?.pull_request?.number;
-  const repo = payload?.repository?.name;
-
-  if (!prNumber || !repo || !["opened", "synchronize", "reopened"].includes(action)) {
-    return res.status(200).send("ignored");
-  }
-
-  return res.status(202).send("received; use /analyze endpoint with changed files payload from CI for MVP");
 });
 
 const port = Number(process.env.PORT || 8787);

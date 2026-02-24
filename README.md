@@ -12,9 +12,10 @@ Backend service that scores pull requests for operational/security risk before m
 - Demo-ready in ~2 weeks with measurable impact.
 
 ## Architecture
-- **GitHub Actions** collects PR changed files/patches.
-- Action calls **`POST /analyze`** on Risk Gate service.
+- **GitHub Actions** (or GitHub webhook) triggers analysis.
+- Service ingests PR files (from CI payload or GitHub API webhook fetch).
 - **Risk Engine** applies heuristic rules and returns score + findings.
+- **Policy Engine** applies per-repo severity thresholds.
 - Service optionally posts PR comment and stores result in **Postgres**.
 
 ## MVP features
@@ -45,8 +46,8 @@ open http://localhost:8787/
 ## DB setup
 Run `sql/init.sql` on your Postgres database.
 
-## Analyze endpoint (current MVP path)
-`POST /analyze`
+## Analyze endpoint
+`POST /analyze` (alias: `POST /api/analyze`)
 
 ```json
 {
@@ -72,8 +73,12 @@ Response:
 }
 ```
 
-## GitHub integration (MVP)
+## GitHub integration
 Workflow file: `.github/workflows/pr-risk-check.yml`
+
+Webhook endpoint:
+- `POST /webhook/github` (supports `opened`, `synchronize`, `reopened` PR events)
+- Requires `GITHUB_TOKEN` + `GITHUB_WEBHOOK_SECRET`
 
 ### Required GitHub secret
 - `RISK_GATE_URL` = your deployed service base URL
@@ -95,6 +100,18 @@ This repo includes `render.yaml`.
 2. GitHub Action runs risk check.
 3. PR shows score + findings comment.
 4. If score >= 80, check fails and blocks merge.
+
+## Policy thresholds (repo-level)
+Default behavior blocks only `critical` severity.
+
+Override with env var:
+```bash
+RISK_POLICIES_JSON='[{"repo":"ai-pr-risk-gate","blockAtOrAbove":"high"},{"repo":"*","blockAtOrAbove":"critical"}]'
+```
+
+## Trends endpoint
+- `GET /api/trends?repo=<name>&days=30`
+- Returns daily average risk score + volume
 
 ## Autonomous operations toolkit
 Scripts in `ops/`:

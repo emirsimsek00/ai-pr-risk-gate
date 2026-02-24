@@ -1,15 +1,4 @@
-export type ChangedFile = {
-  filename: string;
-  status?: string;
-  patch?: string;
-};
-
-export type RiskResult = {
-  score: number;
-  severity: "low" | "medium" | "high" | "critical";
-  findings: string[];
-  recommendations: string[];
-};
+import type { ChangedFile, RiskResult } from "./types.js";
 
 const RULES = [
   {
