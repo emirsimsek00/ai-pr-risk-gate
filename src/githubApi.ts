@@ -1,4 +1,5 @@
 import type { ChangedFile } from "./types.js";
+import { fetchWithRetry } from "./http.js";
 
 type PullFileResponse = {
   filename: string;
@@ -23,7 +24,7 @@ export async function fetchPullRequestFiles(input: {
     url.searchParams.set("per_page", String(perPage));
     url.searchParams.set("page", String(page));
 
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github+json"

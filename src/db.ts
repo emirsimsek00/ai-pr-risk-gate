@@ -1,10 +1,24 @@
-import { Pool } from "pg";
+import { Pool, type QueryResult } from "pg";
 
 const connectionString = process.env.DATABASE_URL;
+const DB_QUERY_TIMEOUT_MS = Number(process.env.DB_QUERY_TIMEOUT_MS ?? 3000);
 
 export const db = connectionString
   ? new Pool({ connectionString })
   : null;
+
+async function queryWithTimeout(query: string, params: Array<string | number>): Promise<QueryResult> {
+  if (!db) throw new Error("database is not configured");
+
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`db query timeout after ${DB_QUERY_TIMEOUT_MS}ms`)), DB_QUERY_TIMEOUT_MS);
+  });
+
+  return Promise.race([
+    db.query(query, params),
+    timeout
+  ]) as Promise<QueryResult>;
+}
 
 export async function saveAssessment(input: {
   repo: string;
@@ -14,7 +28,7 @@ export async function saveAssessment(input: {
   findings: string[];
 }) {
   if (!db) return;
-  await db.query(
+  await queryWithTimeout(
     `insert into risk_assessments (repo, pr_number, score, severity, findings)
      values ($1,$2,$3,$4,$5::jsonb)`,
     [input.repo, input.prNumber, input.score, input.severity, JSON.stringify(input.findings)]
@@ -43,8 +57,12 @@ export async function getRiskTrends(repo?: string, days = 30) {
     order by 1 asc
   `;
 
-  const result = await db.query(query, params);
-  return result.rows as Array<{ day: string; avgScore: number; count: number }>;
+  try {
+    const result = await queryWithTimeout(query, params);
+    return result.rows as Array<{ day: string; avgScore: number; count: number }>;
+  } catch {
+    return [] as Array<{ day: string; avgScore: number; count: number }>;
+  }
 }
 
 export async function getRecentAssessments(limit = 20, repo?: string) {
@@ -68,24 +86,36 @@ export async function getRecentAssessments(limit = 20, repo?: string) {
     where = "where repo = $2";
   }
 
-  const result = await db.query(
-    `select id, repo, pr_number, score, severity, findings, created_at
-     from risk_assessments
-     ${where}
-     order by created_at desc
-     limit $1`,
-    params
-  );
+  try {
+    const result = await queryWithTimeout(
+      `select id, repo, pr_number, score, severity, findings, created_at
+       from risk_assessments
+       ${where}
+       order by created_at desc
+       limit $1`,
+      params
+    );
 
-  return result.rows as Array<{
-    id: number;
-    repo: string;
-    pr_number: number;
-    score: number;
-    severity: string;
-    findings: unknown;
-    created_at: string;
-  }>;
+    return result.rows as Array<{
+      id: number;
+      repo: string;
+      pr_number: number;
+      score: number;
+      severity: string;
+      findings: unknown;
+      created_at: string;
+    }>;
+  } catch {
+    return [] as Array<{
+      id: number;
+      repo: string;
+      pr_number: number;
+      score: number;
+      severity: string;
+      findings: unknown;
+      created_at: string;
+    }>;
+  }
 }
 
 export async function getSeverityDistribution(days = 30, repo?: string) {
@@ -97,16 +127,20 @@ export async function getSeverityDistribution(days = 30, repo?: string) {
     where += ` and repo = $2`;
   }
 
-  const result = await db.query(
-    `select severity, count(*)::int as count
-     from risk_assessments
-     ${where}
-     group by severity
-     order by count(*) desc`,
-    params
-  );
+  try {
+    const result = await queryWithTimeout(
+      `select severity, count(*)::int as count
+       from risk_assessments
+       ${where}
+       group by severity
+       order by count(*) desc`,
+      params
+    );
 
-  return result.rows as Array<{ severity: string; count: number }>;
+    return result.rows as Array<{ severity: string; count: number }>;
+  } catch {
+    return [] as Array<{ severity: string; count: number }>;
+  }
 }
 
 export async function getTopFindings(days = 30, repo?: string, limit = 8) {
@@ -121,16 +155,20 @@ export async function getTopFindings(days = 30, repo?: string, limit = 8) {
   params.push(safeLimit);
 
   const limitPos = params.length;
-  const result = await db.query(
-    `select finding, count(*)::int as count
-     from risk_assessments ra,
-          jsonb_array_elements_text(ra.findings) as finding
-     ${where}
-     group by finding
-     order by count(*) desc
-     limit $${limitPos}`,
-    params
-  );
+  try {
+    const result = await queryWithTimeout(
+      `select finding, count(*)::int as count
+       from risk_assessments ra,
+            jsonb_array_elements_text(ra.findings) as finding
+       ${where}
+       group by finding
+       order by count(*) desc
+       limit $${limitPos}`,
+      params
+    );
 
-  return result.rows as Array<{ finding: string; count: number }>;
+    return result.rows as Array<{ finding: string; count: number }>;
+  } catch {
+    return [] as Array<{ finding: string; count: number }>;
+  }
 }

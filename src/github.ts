@@ -1,3 +1,5 @@
+import { fetchWithRetry } from "./http.js";
+
 export async function postPRComment(input: {
   owner: string;
   repo: string;
@@ -7,7 +9,7 @@ export async function postPRComment(input: {
   const token = process.env.GITHUB_TOKEN;
   if (!token) return;
 
-  await fetch(`https://api.github.com/repos/${input.owner}/${input.repo}/issues/${input.prNumber}/comments`, {
+  const response = await fetchWithRetry(`https://api.github.com/repos/${input.owner}/${input.repo}/issues/${input.prNumber}/comments`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -16,6 +18,11 @@ export async function postPRComment(input: {
     },
     body: JSON.stringify({ body: input.body })
   });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`GitHub comment API error ${response.status}: ${detail}`);
+  }
 }
 
 export function formatComment(score: number, severity: string, findings: string[], recommendations: string[]) {

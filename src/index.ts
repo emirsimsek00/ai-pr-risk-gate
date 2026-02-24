@@ -34,6 +34,14 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((_req, res, next) => {
+  res.setHeader("x-content-type-options", "nosniff");
+  res.setHeader("x-frame-options", "DENY");
+  res.setHeader("referrer-policy", "no-referrer");
+  res.setHeader("x-xss-protection", "0");
+  next();
+});
+
 app.use(express.json({
   limit: "2mb",
   verify: (req, _res, buf) => {
@@ -87,18 +95,42 @@ function logEvent(level: "info" | "error", req: express.Request, message: string
   console.log(JSON.stringify(payload));
 }
 
+type AsyncRoute = (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<unknown>;
+
+function asyncHandler(fn: AsyncRoute) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    fn(req, res, next).catch(next);
+  };
+}
+
 function validSignature(payload: Buffer, signatureHeader?: string) {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
   if (!secret) return true;
   if (!signatureHeader) return false;
 
   const expected = `sha256=${crypto.createHmac("sha256", secret).update(payload).digest("hex")}`;
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
+  const expectedBuf = Buffer.from(expected);
+  const receivedBuf = Buffer.from(signatureHeader);
+  if (expectedBuf.length !== receivedBuf.length) return false;
+
+  return crypto.timingSafeEqual(expectedBuf, receivedBuf);
 }
 
 function validateAnalyzeRequest(body: AnalyzeRequest) {
-  if (!body.repo || !body.prNumber || !Array.isArray(body.files)) {
-    return "repo, prNumber, and files are required";
+  if (!body || typeof body !== "object") {
+    return "invalid request body";
+  }
+
+  if (!body.repo || !body.prNumber || !Array.isArray(body.files) || body.files.length === 0) {
+    return "repo, prNumber, and non-empty files are required";
+  }
+
+  if (!Number.isInteger(body.prNumber) || body.prNumber <= 0) {
+    return "prNumber must be a positive integer";
+  }
+
+  if (body.owner !== undefined && (typeof body.owner !== "string" || body.owner.length === 0)) {
+    return "owner must be a non-empty string when provided";
   }
 
   if (body.files.some((file) => typeof file.filename !== "string" || file.filename.length === 0)) {
@@ -143,37 +175,37 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "ai-pr-risk-gate" });
 });
 
-app.get("/api/trends", async (req, res) => {
+app.get("/api/trends", asyncHandler(async (req, res) => {
   const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;
   const days = typeof req.query.days === "string" ? Number(req.query.days) : 30;
   const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
   const trends = await getRiskTrends(repo, safeDays);
   return res.json({ repo: repo ?? "all", days: safeDays, trends });
-});
+}));
 
-app.get("/api/recent", async (req, res) => {
+app.get("/api/recent", asyncHandler(async (req, res) => {
   const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;
   const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 20;
   const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 100)) : 20;
   const rows = await getRecentAssessments(safeLimit, repo);
   return res.json({ limit: safeLimit, rows });
-});
+}));
 
-app.get("/api/severity", async (req, res) => {
+app.get("/api/severity", asyncHandler(async (req, res) => {
   const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;
   const days = typeof req.query.days === "string" ? Number(req.query.days) : 30;
   const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
   const rows = await getSeverityDistribution(safeDays, repo);
   return res.json({ repo: repo ?? "all", days: safeDays, rows });
-});
+}));
 
-app.get("/api/findings", async (req, res) => {
+app.get("/api/findings", asyncHandler(async (req, res) => {
   const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;
   const days = typeof req.query.days === "string" ? Number(req.query.days) : 30;
   const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
   const rows = await getTopFindings(safeDays, repo, 8);
   return res.json({ repo: repo ?? "all", days: safeDays, rows });
-});
+}));
 
 const analyzeHandler = async (req: express.Request, res: express.Response) => {
   const payload = req.body as AnalyzeRequest;
@@ -207,10 +239,10 @@ const analyzeHandler = async (req: express.Request, res: express.Response) => {
   return res.status(policy.allowed ? 200 : 409).json({ ...result, policy });
 };
 
-app.post("/analyze", analyzeHandler);
-app.post("/api/analyze", analyzeHandler);
+app.post("/analyze", asyncHandler(analyzeHandler));
+app.post("/api/analyze", asyncHandler(analyzeHandler));
 
-app.post("/webhook/github", async (req, res) => {
+app.post("/webhook/github", asyncHandler(async (req, res) => {
   try {
     const rawBody = (req as express.Request & { rawBody?: Buffer }).rawBody;
     if (!rawBody) {
@@ -260,6 +292,14 @@ app.post("/webhook/github", async (req, res) => {
       detail: error instanceof Error ? error.message : "unknown error"
     });
   }
+}));
+
+app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logEvent("error", req, "unhandled route error", {
+    detail: err instanceof Error ? err.message : "unknown error"
+  });
+
+  return res.status(500).json({ error: "internal server error" });
 });
 
 if (process.env.NODE_ENV !== "test") {
