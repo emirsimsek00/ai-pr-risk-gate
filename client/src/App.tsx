@@ -22,6 +22,11 @@ type TrendRow = { day: string; avgScore: number; count: number };
 type SeverityRow = { severity: string; count: number };
 type FindingRow = { finding: string; count: number };
 
+function getStoredKey(name: string) {
+  if (typeof window === "undefined") return "";
+  return window.sessionStorage.getItem(name) ?? "";
+}
+
 function shell(children: ReactNode) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#070611] text-white">
@@ -59,6 +64,7 @@ function AnalyzerView() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
+  const [writeKey, setWriteKey] = useState(getStoredKey("riskgate_write_key"));
 
   const severityClass = useMemo(() => {
     if (!result) return "";
@@ -72,9 +78,14 @@ function AnalyzerView() {
     setError(null);
     setResult(null);
     try {
+      const headers: HeadersInit = {
+        "content-type": "application/json",
+        ...(writeKey.trim() ? { "x-api-key": writeKey.trim() } : {})
+      };
+
       const res = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers,
         body: JSON.stringify({ repo, prNumber, files: [{ filename, patch }] })
       });
       const data = await res.json();
@@ -97,6 +108,20 @@ function AnalyzerView() {
           <label className="block text-sm text-violet-100/90">PR Number<input type="number" value={prNumber} onChange={(e) => setPrNumber(Number(e.target.value || 1))} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
           <label className="block text-sm text-violet-100/90">Filename<input value={filename} onChange={(e) => setFilename(e.target.value)} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
           <label className="block text-sm text-violet-100/90">Patch Snippet<textarea value={patch} onChange={(e) => setPatch(e.target.value)} className="mt-1 h-28 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
+          <label className="block text-sm text-violet-100/90">Write API Key (optional)
+            <input
+              value={writeKey}
+              onChange={(e) => {
+                setWriteKey(e.target.value);
+                if (typeof window !== "undefined") {
+                  if (e.target.value.trim()) window.sessionStorage.setItem("riskgate_write_key", e.target.value.trim());
+                  else window.sessionStorage.removeItem("riskgate_write_key");
+                }
+              }}
+              placeholder="needed when API auth is enabled"
+              className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2"
+            />
+          </label>
           <button onClick={analyze} disabled={loading} className="w-full rounded-lg bg-violet-500 px-4 py-2 font-medium hover:bg-violet-400 disabled:opacity-60">{loading ? "Analyzing..." : "Analyze Risk"}</button>
         </div>
       </section>
@@ -145,6 +170,7 @@ function GuideView() {
 function DashboardView() {
   const [repo, setRepo] = useState("");
   const [days, setDays] = useState("30");
+  const [readKey, setReadKey] = useState(getStoredKey("riskgate_read_key"));
   const [rows, setRows] = useState<RecentRow[]>([]);
   const [trends, setTrends] = useState<TrendRow[]>([]);
   const [severity, setSeverity] = useState<SeverityRow[]>([]);
@@ -154,14 +180,15 @@ function DashboardView() {
   async function load() {
     setError(null);
     const q = new URLSearchParams({ days });
+    const headers: HeadersInit = readKey.trim() ? { "x-api-key": readKey.trim() } : {};
     if (repo.trim()) q.set("repo", repo.trim());
 
     try {
       const [recentRes, trendsRes, sevRes, findRes] = await Promise.all([
-        fetch(`/api/recent?limit=20${repo.trim() ? `&repo=${encodeURIComponent(repo.trim())}` : ""}`),
-        fetch(`/api/trends?${q.toString()}`),
-        fetch(`/api/severity?${q.toString()}`),
-        fetch(`/api/findings?${q.toString()}`)
+        fetch(`/api/recent?limit=20${repo.trim() ? `&repo=${encodeURIComponent(repo.trim())}` : ""}`, { headers }),
+        fetch(`/api/trends?${q.toString()}`, { headers }),
+        fetch(`/api/severity?${q.toString()}`, { headers }),
+        fetch(`/api/findings?${q.toString()}`, { headers })
       ]);
 
       if (!recentRes.ok || !trendsRes.ok || !sevRes.ok || !findRes.ok) {
@@ -200,7 +227,24 @@ function DashboardView() {
           <select value={days} onChange={(e) => setDays(e.target.value)} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm">
             <option value="7">7d</option><option value="30">30d</option><option value="90">90d</option>
           </select>
-          <button onClick={load} className="rounded-lg bg-violet-500 px-3 py-2 text-sm font-medium hover:bg-violet-400">Apply</button>
+          <input
+            value={readKey}
+            onChange={(e) => setReadKey(e.target.value)}
+            placeholder="read API key (optional)"
+            className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+          />
+          <button
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                if (readKey.trim()) window.sessionStorage.setItem("riskgate_read_key", readKey.trim());
+                else window.sessionStorage.removeItem("riskgate_read_key");
+              }
+              load();
+            }}
+            className="rounded-lg bg-violet-500 px-3 py-2 text-sm font-medium hover:bg-violet-400"
+          >
+            Apply
+          </button>
         </div>
       </section>
 
