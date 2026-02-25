@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,9 +15,13 @@
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; min-height: 100%; }
 body {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: "Cormorant Garamond", "Times New Roman", Georgia, serif;
   background: var(--bg);
   color: var(--text);
+}
+
+* {
+  font-family: inherit;
 }
 
 @layer base {
