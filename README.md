@@ -36,8 +36,10 @@ cp .env.example .env
 npm run dev
 ```
 
-Health check:
+Health checks:
 ```bash
+curl http://localhost:8787/health/live
+curl http://localhost:8787/health/ready
 curl http://localhost:8787/health
 ```
 
@@ -73,7 +75,21 @@ CORS_ORIGINS='https://example.com,https://dashboard.example.com'
 ```
 
 ## DB setup
-Run `sql/init.sql` on your Postgres database.
+Run migrations:
+```bash
+npm run migrate
+```
+
+Legacy bootstrap SQL still exists at `sql/init.sql`.
+
+## Docker (free self-host setup)
+```bash
+docker compose up --build
+```
+
+This starts:
+- app on `http://localhost:8787`
+- postgres on `localhost:5432`
 
 ## Analyze endpoint
 `POST /analyze` (alias: `POST /api/analyze`)
@@ -173,6 +189,7 @@ Examples:
 ## Operations
 - Onboarding guide: `docs/ONBOARDING.md`
 - Runbook: `docs/RUNBOOK.md`
+- Backup/restore: `docs/BACKUP-RESTORE.md`
 - Security policy: `SECURITY.md`
 - Release notes: `CHANGELOG.md`
 

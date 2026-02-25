@@ -170,6 +170,16 @@ export async function getSeverityDistribution(days = 30, repo?: string) {
   }
 }
 
+export async function checkDbReady() {
+  if (!db) return true;
+  try {
+    await queryWithTimeout("select 1", []);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function getTopFindings(days = 30, repo?: string, limit = 8) {
   if (!db) return [] as Array<{ finding: string; count: number }>;
   const safeLimit = Math.max(1, Math.min(limit, 20));

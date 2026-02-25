@@ -14,13 +14,14 @@
 2. Confirm CI green (build + tests + coverage)
 3. Verify Render deployed latest commit
 4. Smoke test:
-   - `GET /health`
+   - `GET /health/live`
+   - `GET /health/ready`
    - `GET /dashboard`
    - `POST /api/analyze`
 
 ## 4) Rollback procedure
 1. In Render, rollback to previous healthy deploy
-2. Validate `/health` and `/api/analyze`
+2. Validate `/health/live`, `/health/ready`, and `/api/analyze`
 3. Announce rollback + incident summary
 
 ## 5) Incident triage

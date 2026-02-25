@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { evaluateRisk } from "./riskEngine.js";
 import {
+  checkDbReady,
   getRecentAssessments,
   getRiskTrends,
   getSeverityDistribution,
@@ -313,9 +314,21 @@ app.get("/docs/onboarding", (_req, res) => {
   res.redirect("https://github.com/emirsimsek00/ai-pr-risk-gate/blob/main/docs/ONBOARDING.md");
 });
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "ai-pr-risk-gate" });
+app.get("/health/live", (_req, res) => {
+  res.json({ ok: true, service: "ai-pr-risk-gate", check: "live" });
 });
+
+app.get("/health/ready", asyncHandler(async (_req, res) => {
+  const dbReady = await checkDbReady();
+  if (!dbReady) return res.status(503).json({ ok: false, service: "ai-pr-risk-gate", check: "ready", db: "down" });
+  return res.json({ ok: true, service: "ai-pr-risk-gate", check: "ready", db: "up" });
+}));
+
+app.get("/health", asyncHandler(async (_req, res) => {
+  const dbReady = await checkDbReady();
+  if (!dbReady) return res.status(503).json({ ok: false, service: "ai-pr-risk-gate", db: "down" });
+  return res.json({ ok: true, service: "ai-pr-risk-gate", db: "up" });
+}));
 
 app.get("/api/trends", requireApiRole("read"), asyncHandler(async (req, res) => {
   const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;

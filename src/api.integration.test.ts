@@ -11,6 +11,16 @@ describe("api integration", () => {
     expect(res.headers["x-frame-options"]).toBe("DENY");
   });
 
+  it("returns live and ready health endpoints", async () => {
+    const live = await request(app).get("/health/live");
+    const ready = await request(app).get("/health/ready");
+
+    expect(live.status).toBe(200);
+    expect(ready.status).toBe(200);
+    expect(live.body.check).toBe("live");
+    expect(ready.body.check).toBe("ready");
+  });
+
 
   it("validates analyze payload", async () => {
     const res = await request(app).post("/api/analyze").send({ repo: "x" });
