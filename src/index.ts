@@ -303,7 +303,7 @@ app.get("/", (_req, res) => {
 });
 
 app.get("/dashboard", (_req, res) => {
-  res.sendFile(path.join(publicDir, "dashboard.html"));
+  res.sendFile(path.join(publicDir, "index.html"));
 });
 
 app.get("/openapi.yaml", (_req, res) => {
