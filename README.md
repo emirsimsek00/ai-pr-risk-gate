@@ -5,6 +5,9 @@ Backend service that scores pull requests for operational/security risk before m
 ![Node](https://img.shields.io/badge/node-22+-green)
 ![TypeScript](https://img.shields.io/badge/typescript-5-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![CI](https://github.com/emirsimsek00/ai-pr-risk-gate/actions/workflows/ci.yml/badge.svg)
+![E2E Smoke](https://github.com/emirsimsek00/ai-pr-risk-gate/actions/workflows/e2e-smoke.yml/badge.svg)
+![Release Health Gate](https://github.com/emirsimsek00/ai-pr-risk-gate/actions/workflows/release-health-gate.yml/badge.svg)
 
 ## Why this project
 - Matches current employer pain: AI-assisted code ships fast, but quality/safety checks lag.
@@ -181,6 +184,10 @@ Examples:
 
 ## Architecture
 - Diagram + request flow: `docs/ARCHITECTURE.md`
+- Threat model: `docs/THREAT-MODEL.md`
+
+## Configuration
+- Full env/config reference: `docs/CONFIGURATION.md`
 
 ## API contract and tooling
 - OpenAPI spec: `openapi.yaml`

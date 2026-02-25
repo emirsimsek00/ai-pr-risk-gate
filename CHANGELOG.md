@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0] - 2026-02-24
+### Added
+- Sprint 3 production-positioning assets:
+  - E2E smoke workflow (`.github/workflows/e2e-smoke.yml`)
+  - Local/CI smoke script (`ops/smoke-e2e.sh`)
+  - Configuration reference (`docs/CONFIGURATION.md`)
+  - Threat model (`docs/THREAT-MODEL.md`)
+- README workflow badges and documentation index updates.
+
+### Changed
+- Project ops baseline now includes automated smoke validation in CI.
+
 ## [1.0.0] - 2026-02-24
 ### Added
 - End-to-end PR risk scoring service with policy gating.
