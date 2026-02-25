@@ -119,6 +119,7 @@ function AnalyzerView() {
                 }
               }}
               placeholder="needed when API auth is enabled"
+              title="Use a write key for analyze endpoints; stored only in this tab session."
               className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2"
             />
           </label>
@@ -231,6 +232,7 @@ function DashboardView() {
             value={readKey}
             onChange={(e) => setReadKey(e.target.value)}
             placeholder="read API key (optional)"
+            title="Use a read key when API auth is enabled; stored only in this tab session."
             className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
           />
           <button

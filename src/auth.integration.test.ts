@@ -38,17 +38,24 @@ describe("auth + cors integration", () => {
     expect(res.status).toBe(403);
   });
 
-  it("allows read endpoint with read key", async () => {
+  it("requires read key for read endpoint when auth is enabled", async () => {
     const app = await loadAppWithEnv({
       API_KEYS_JSON: JSON.stringify([{ key: "read-key", role: "read" }]),
       CORS_ORIGINS: undefined
     });
 
-    const res = await request(app)
+    const missing = await request(app).get("/api/recent");
+    expect(missing.status).toBe(401);
+
+    const withHeader = await request(app)
       .get("/api/recent")
       .set("x-api-key", "read-key");
+    expect(withHeader.status).toBe(200);
 
-    expect(res.status).toBe(200);
+    const withBearer = await request(app)
+      .get("/api/recent")
+      .set("authorization", "Bearer read-key");
+    expect(withBearer.status).toBe(200);
   });
 
   it("applies CORS allowlist", async () => {
