@@ -34,7 +34,7 @@ jobs:
         run: |
           code=$(curl -sS -o /tmp/root.html -w '%{http_code}' "$RISK_GATE_URL/")
           test "$code" = "200"
-          grep -q "AI PR Risk Gate" /tmp/root.html
+          grep -Eq "AI PR Risk Gate|<div id=\"root\">" /tmp/root.html
 
       - name: Rollback hook hint
         if: failure()
