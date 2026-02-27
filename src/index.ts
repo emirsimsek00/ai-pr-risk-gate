@@ -22,6 +22,24 @@ const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, "..", "public");
 
 export const app = express();
+app.disable("x-powered-by");
+
+const IS_PROD = process.env.NODE_ENV === "production";
+const ENFORCE_API_KEYS_IN_PROD = (process.env.ENFORCE_API_KEYS_IN_PROD ?? "true") === "true";
+const ENFORCE_WEBHOOK_SECRET_IN_PROD = (process.env.ENFORCE_WEBHOOK_SECRET_IN_PROD ?? "true") === "true";
+const ENABLE_HSTS = (process.env.ENABLE_HSTS ?? "true") === "true";
+const TRUST_PROXY = process.env.TRUST_PROXY;
+
+if (TRUST_PROXY !== undefined) {
+  const normalized = TRUST_PROXY.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) app.set("trust proxy", true);
+  else if (["0", "false", "no", "off"].includes(normalized)) app.set("trust proxy", false);
+  else {
+    const hops = Number(TRUST_PROXY);
+    if (Number.isInteger(hops) && hops >= 0) app.set("trust proxy", hops);
+    else app.set("trust proxy", TRUST_PROXY);
+  }
+}
 
 // Lightweight in-memory limiter for public API routes.
 const hits = new Map<string, { count: number; resetAt: number }>();
@@ -40,6 +58,17 @@ app.use((req, res, next) => {
   res.setHeader("x-frame-options", "DENY");
   res.setHeader("referrer-policy", "no-referrer");
   res.setHeader("x-xss-protection", "0");
+  res.setHeader("x-permitted-cross-domain-policies", "none");
+  res.setHeader("cross-origin-opener-policy", "same-origin");
+  res.setHeader("cross-origin-resource-policy", "same-origin");
+  res.setHeader("permissions-policy", "accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=()");
+  res.setHeader("content-security-policy", "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'self'");
+
+  const proto = req.header("x-forwarded-proto")?.split(",")[0]?.trim();
+  const secure = req.secure || proto === "https";
+  if (ENABLE_HSTS && secure) {
+    res.setHeader("strict-transport-security", "max-age=31536000; includeSubDomains");
+  }
 
   if (corsOrigins.length > 0) {
     const origin = req.header("origin");
@@ -108,6 +137,14 @@ const apiKeys = (() => {
     return [] as ApiKeyConfig[];
   }
 })();
+
+if (IS_PROD && ENFORCE_API_KEYS_IN_PROD && apiKeys.length === 0) {
+  throw new Error("Refusing to start in production without API_KEYS_JSON (set ENFORCE_API_KEYS_IN_PROD=false to override)");
+}
+
+if (IS_PROD && ENFORCE_WEBHOOK_SECRET_IN_PROD && !process.env.GITHUB_WEBHOOK_SECRET) {
+  throw new Error("Refusing to start in production without GITHUB_WEBHOOK_SECRET (set ENFORCE_WEBHOOK_SECRET_IN_PROD=false to override)");
+}
 
 const corsOrigins = (process.env.CORS_ORIGINS ?? "")
   .split(",")

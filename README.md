@@ -52,11 +52,20 @@ open http://localhost:8787/
 ```
 
 ## Authentication & CORS (Sprint 1)
-By default, API key auth is disabled (no keys configured).
+In local/dev, API keys are optional by default.
+In production (`NODE_ENV=production`), startup now fails closed unless keys are configured.
 
 Enable role-based API keys:
 ```bash
 API_KEYS_JSON='[{"key":"read-key","role":"read"},{"key":"write-key","role":"write"}]'
+```
+
+Production safety defaults:
+```bash
+ENFORCE_API_KEYS_IN_PROD=true
+ENFORCE_WEBHOOK_SECRET_IN_PROD=true
+ENABLE_HSTS=true
+TRUST_PROXY=true
 ```
 
 Use either header:
@@ -182,7 +191,7 @@ Examples:
 - Add threshold policies per repo/team
 - Add trend dashboard (risk over time by repo/team)
 
-## Architecture
+## Documentation
 - Diagram + request flow: `docs/ARCHITECTURE.md`
 - Threat model: `docs/THREAT-MODEL.md`
 

@@ -18,3 +18,13 @@ services:
         sync: false
       - key: GITHUB_WEBHOOK_SECRET
         sync: false
+      - key: API_KEYS_JSON
+        sync: false
+      - key: ENFORCE_API_KEYS_IN_PROD
+        value: true
+      - key: ENFORCE_WEBHOOK_SECRET_IN_PROD
+        value: true
+      - key: ENABLE_HSTS
+        value: true
+      - key: TRUST_PROXY
+        value: true
