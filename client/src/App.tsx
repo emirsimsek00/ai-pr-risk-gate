@@ -43,9 +43,16 @@ function shell(children: ReactNode) {
 function Header({ dashboard, onSwitch }: { dashboard: boolean; onSwitch: (next: "analyzer" | "dashboard") => void }) {
   return (
     <header className="mb-8 flex items-center justify-between gap-3">
-      <div>
-        <p className="text-xs uppercase tracking-[0.35em] text-violet-200/80">AI Security Platform</p>
-        <h1 className="mt-2 bg-gradient-to-r from-fuchsia-200 via-violet-100 to-indigo-200 bg-clip-text text-4xl font-semibold tracking-tight text-transparent md:text-5xl">AI PR Risk Gate</h1>
+      <div className="flex items-center gap-4">
+        <img
+          src="/logo.png"
+          alt="AI PR Risk Gate logo"
+          className="h-12 w-12 rounded-xl border border-white/20 bg-black/30 object-cover shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+        />
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-violet-200/80">AI Security Platform</p>
+          <h1 className="mt-2 bg-gradient-to-r from-fuchsia-200 via-violet-100 to-indigo-200 bg-clip-text text-4xl font-semibold tracking-tight text-transparent md:text-5xl">AI PR Risk Gate</h1>
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <button onClick={() => onSwitch("analyzer")} className={`rounded-full border px-4 py-2 text-sm backdrop-blur ${!dashboard ? "border-violet-300/60 bg-violet-500/40" : "border-white/20 bg-white/10 hover:bg-white/20"}`}>Analyzer</button>
