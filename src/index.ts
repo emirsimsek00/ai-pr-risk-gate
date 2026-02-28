@@ -30,20 +30,6 @@ const ENFORCE_WEBHOOK_SECRET_IN_PROD = (process.env.ENFORCE_WEBHOOK_SECRET_IN_PR
 const ENABLE_HSTS = (process.env.ENABLE_HSTS ?? "true") === "true";
 const TRUST_PROXY = process.env.TRUST_PROXY;
 
-function getBoundedIntEnv(name: string, fallback: number, opts: { min?: number; max?: number } = {}) {
-  const raw = process.env[name];
-  if (raw === undefined || raw.trim() === "") return fallback;
-
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed)) return fallback;
-
-  const truncated = Math.trunc(parsed);
-  const min = opts.min ?? Number.NEGATIVE_INFINITY;
-  const max = opts.max ?? Number.POSITIVE_INFINITY;
-
-  return Math.min(max, Math.max(min, truncated));
-}
-
 if (TRUST_PROXY !== undefined) {
   const normalized = TRUST_PROXY.trim().toLowerCase();
   if (["1", "true", "yes", "on"].includes(normalized)) app.set("trust proxy", true);
@@ -58,7 +44,7 @@ if (TRUST_PROXY !== undefined) {
 // Lightweight in-memory limiter for public API routes.
 const hits = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = getBoundedIntEnv("RATE_LIMIT_MAX_PER_MIN", 120, { min: 1, max: 10_000 });
+const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX_PER_MIN ?? 120);
 
 app.use((req, res, next) => {
   const requestId = crypto.randomUUID();
@@ -98,10 +84,8 @@ app.use((req, res, next) => {
   next();
 });
 
-const JSON_BODY_LIMIT_MB = getBoundedIntEnv("JSON_BODY_LIMIT_MB", 2, { min: 1, max: 10 });
-
 app.use(express.json({
-  limit: `${JSON_BODY_LIMIT_MB}mb`,
+  limit: "2mb",
   verify: (req, _res, buf) => {
     (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
   }
@@ -134,9 +118,9 @@ type AnalyzeRequest = {
   files: ChangedFile[];
 };
 
-const MAX_FILES_PER_REQUEST = getBoundedIntEnv("MAX_FILES_PER_REQUEST", 500, { min: 1, max: 5_000 });
-const MAX_FILENAME_LENGTH = getBoundedIntEnv("MAX_FILENAME_LENGTH", 300, { min: 16, max: 1024 });
-const MAX_PATCH_LENGTH = getBoundedIntEnv("MAX_PATCH_LENGTH", 200_000, { min: 1024, max: 1_000_000 });
+const MAX_FILES_PER_REQUEST = Number(process.env.MAX_FILES_PER_REQUEST ?? 500);
+const MAX_FILENAME_LENGTH = Number(process.env.MAX_FILENAME_LENGTH ?? 300);
+const MAX_PATCH_LENGTH = Number(process.env.MAX_PATCH_LENGTH ?? 200_000);
 const REPO_NAME_PATTERN = /^[A-Za-z0-9._-]{1,100}$/;
 const OWNER_NAME_PATTERN = /^[A-Za-z0-9._-]{1,100}$/;
 
@@ -146,15 +130,11 @@ type ApiKeyConfig = { key: string; role: ApiRole; repos?: string[] };
 const apiKeys = (() => {
   const raw = process.env.API_KEYS_JSON;
   if (!raw) return [] as ApiKeyConfig[];
-
-  const normalized = raw.trim().toLowerCase();
-  if (normalized === "" || normalized === "undefined" || normalized === "null") return [] as ApiKeyConfig[];
-
   try {
     const parsed = JSON.parse(raw) as ApiKeyConfig[];
     return parsed.filter((k) => k && typeof k.key === "string" && (k.role === "read" || k.role === "write"));
   } catch {
-    throw new Error("API_KEYS_JSON is not valid JSON");
+    return [] as ApiKeyConfig[];
   }
 })();
 
@@ -214,20 +194,6 @@ function canAccessRepo(config: ApiKeyConfig, repo?: string) {
   return config.repos.includes(repo);
 }
 
-function safeTokenMatch(left: string, right: string) {
-  const leftBuf = Buffer.from(left);
-  const rightBuf = Buffer.from(right);
-  if (leftBuf.length !== rightBuf.length) return false;
-  return crypto.timingSafeEqual(leftBuf, rightBuf);
-}
-
-function findApiKeyConfigByToken(token: string) {
-  for (const config of apiKeys) {
-    if (safeTokenMatch(config.key, token)) return config;
-  }
-  return undefined;
-}
-
 function requireApiRole(role: ApiRole) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (apiKeys.length === 0) return next();
@@ -235,7 +201,7 @@ function requireApiRole(role: ApiRole) {
     const token = extractApiKey(req);
     if (!token) return res.status(401).json({ error: "missing API key" });
 
-    const key = findApiKeyConfigByToken(token);
+    const key = apiKeys.find((k) => k.key === token);
     if (!key) return res.status(401).json({ error: "invalid API key" });
 
     if (role === "write" && key.role !== "write") return res.status(403).json({ error: "write access required" });
@@ -255,7 +221,7 @@ function requireWebhookAccess(req: express.Request, res: express.Response, next:
 
   const token = extractApiKey(req);
   if (token) {
-    const key = findApiKeyConfigByToken(token);
+    const key = apiKeys.find((k) => k.key === token);
     if (key?.role === "write") return next();
   }
 
