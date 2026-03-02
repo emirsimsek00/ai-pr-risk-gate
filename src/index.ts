@@ -45,6 +45,9 @@ if (TRUST_PROXY !== undefined) {
 const hits = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX_PER_MIN ?? 120);
+const RATE_LIMIT_MAX_KEYS = Number(process.env.RATE_LIMIT_MAX_KEYS ?? 10_000);
+const RATE_LIMIT_CLEANUP_EVERY = Number(process.env.RATE_LIMIT_CLEANUP_EVERY ?? 100);
+let rateLimitReqCounter = 0;
 
 app.use((req, res, next) => {
   const requestId = crypto.randomUUID();
@@ -97,6 +100,11 @@ app.use((req, res, next) => {
 
   const key = req.ip || "unknown";
   const now = Date.now();
+  rateLimitReqCounter += 1;
+  if (rateLimitReqCounter % RATE_LIMIT_CLEANUP_EVERY === 0 || hits.size > RATE_LIMIT_MAX_KEYS) {
+    pruneRateLimiter(now);
+  }
+
   const entry = hits.get(key);
   if (!entry || now > entry.resetAt) {
     hits.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
@@ -188,6 +196,30 @@ function extractApiKey(req: express.Request) {
   return undefined;
 }
 
+function secureTokenEqual(a: string, b: string) {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) return false;
+  return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+function findApiKeyConfig(token: string) {
+  return apiKeys.find((k) => secureTokenEqual(k.key, token));
+}
+
+function pruneRateLimiter(now: number) {
+  for (const [key, entry] of hits.entries()) {
+    if (now > entry.resetAt) hits.delete(key);
+  }
+
+  if (hits.size <= RATE_LIMIT_MAX_KEYS) return;
+
+  for (const key of hits.keys()) {
+    hits.delete(key);
+    if (hits.size <= RATE_LIMIT_MAX_KEYS) break;
+  }
+}
+
 function canAccessRepo(config: ApiKeyConfig, repo?: string) {
   if (!config.repos || config.repos.length === 0 || config.repos.includes("*")) return true;
   if (!repo) return true;
@@ -201,7 +233,7 @@ function requireApiRole(role: ApiRole) {
     const token = extractApiKey(req);
     if (!token) return res.status(401).json({ error: "missing API key" });
 
-    const key = apiKeys.find((k) => k.key === token);
+    const key = findApiKeyConfig(token);
     if (!key) return res.status(401).json({ error: "invalid API key" });
 
     if (role === "write" && key.role !== "write") return res.status(403).json({ error: "write access required" });
@@ -221,7 +253,7 @@ function requireWebhookAccess(req: express.Request, res: express.Response, next:
 
   const token = extractApiKey(req);
   if (token) {
-    const key = apiKeys.find((k) => k.key === token);
+    const key = findApiKeyConfig(token);
     if (key?.role === "write") return next();
   }
 

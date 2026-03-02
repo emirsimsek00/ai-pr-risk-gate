@@ -31,4 +31,23 @@ describe("http retry helper", () => {
     await expect(fetchWithRetry("https://example.com")).rejects.toThrow("network down");
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
+
+  it("aborts requests that exceed HTTP timeout", async () => {
+    const original = process.env.HTTP_TIMEOUT_MS;
+    process.env.HTTP_TIMEOUT_MS = "10";
+
+    vi.resetModules();
+    const { fetchWithRetry: fetchWithTimeout } = await import("./http.js");
+
+    const fetchMock = vi.fn((_url: string | URL, init?: RequestInit) => new Promise((_, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+    }));
+
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    await expect(fetchWithTimeout("https://example.com")).rejects.toThrow("aborted");
+
+    process.env.HTTP_TIMEOUT_MS = original;
+    vi.resetModules();
+  });
 });
