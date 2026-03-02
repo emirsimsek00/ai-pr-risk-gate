@@ -154,6 +154,10 @@ if (IS_PROD && ENFORCE_WEBHOOK_SECRET_IN_PROD && !process.env.GITHUB_WEBHOOK_SEC
   throw new Error("Refusing to start in production without GITHUB_WEBHOOK_SECRET (set ENFORCE_WEBHOOK_SECRET_IN_PROD=false to override)");
 }
 
+if (!IS_PROD && apiKeys.length === 0 && !process.env.GITHUB_WEBHOOK_SECRET) {
+  console.warn("[security] API_KEYS_JSON and GITHUB_WEBHOOK_SECRET are both unset; /api and /webhook routes may be effectively open in this environment.");
+}
+
 const corsOrigins = (process.env.CORS_ORIGINS ?? "")
   .split(",")
   .map((v) => v.trim())

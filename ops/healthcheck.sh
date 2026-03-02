@@ -8,16 +8,25 @@ if [[ -n "$API_KEY" ]]; then
   AUTH_HEADER=(-H "x-api-key: ${API_KEY}")
 fi
 
+check_ok_json() {
+  local json="$1"
+  if command -v jq >/dev/null 2>&1; then
+    echo "$json" | jq -e '.ok == true' >/dev/null
+  else
+    echo "$json" | grep -Eq '"ok"\s*:\s*true'
+  fi
+}
+
 echo "[healthcheck] Checking ${BASE_URL}/health/live"
 LIVE_JSON="$(curl -fsS "${BASE_URL}/health/live")"
-echo "$LIVE_JSON" | grep -q '"ok":true\|"ok": true' || {
+check_ok_json "$LIVE_JSON" || {
   echo "[healthcheck] Live endpoint is not healthy"
   exit 1
 }
 
 echo "[healthcheck] Checking ${BASE_URL}/health/ready"
 READY_JSON="$(curl -fsS "${BASE_URL}/health/ready")"
-echo "$READY_JSON" | grep -q '"ok":true\|"ok": true' || {
+check_ok_json "$READY_JSON" || {
   echo "[healthcheck] Ready endpoint is not healthy"
   exit 1
 }

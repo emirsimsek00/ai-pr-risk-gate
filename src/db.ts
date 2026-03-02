@@ -26,9 +26,10 @@ async function queryWithTimeout(query: string, params: Array<string | number>): 
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= DB_QUERY_RETRY_ATTEMPTS; attempt += 1) {
+    let timeoutHandle: NodeJS.Timeout | undefined;
     try {
       const timeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(`db query timeout after ${DB_QUERY_TIMEOUT_MS}ms`)), DB_QUERY_TIMEOUT_MS);
+        timeoutHandle = setTimeout(() => reject(new Error(`db query timeout after ${DB_QUERY_TIMEOUT_MS}ms`)), DB_QUERY_TIMEOUT_MS);
       });
 
       return await Promise.race([
@@ -41,6 +42,8 @@ async function queryWithTimeout(query: string, params: Array<string | number>): 
         throw error;
       }
       await sleep(DB_QUERY_RETRY_BASE_MS * 2 ** (attempt - 1));
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
     }
   }
 
