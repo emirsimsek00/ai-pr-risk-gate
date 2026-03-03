@@ -48,6 +48,9 @@
 ## 8) Verification checklist (release)
 - [ ] CI passes
 - [ ] Deployment healthy
+- [ ] Root page branding verified (`<title>AI PR Risk Gate</title>`)
 - [ ] Dashboard loads
+- [ ] Security headers verified (`x-content-type-options`, CSP, COOP/CORP) and `x-powered-by` absent
+- [ ] API auth enforcement verified (unauthenticated `/api/*` returns 401 when keys configured)
 - [ ] Webhook signature validation tested
 - [ ] Policy gate behavior validated (allow + block)

@@ -41,7 +41,7 @@ Owner: Eks
 - [x] Build + tests + coverage gate in CI
 - [x] PR risk check workflow in place
 - [x] Post-deploy health gate workflow in place
-- [ ] Add dependency review / CodeQL workflow (recommended next)
+- [x] CodeQL workflow in place (`.github/workflows/codeql.yml`)
 
 ## 6) Deployment config hardening
 - [x] Render blueprint includes required production env vars:
