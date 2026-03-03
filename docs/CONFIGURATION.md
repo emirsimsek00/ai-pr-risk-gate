@@ -29,6 +29,8 @@
 - `MAX_FILENAME_LENGTH` (default: `300`)
 - `MAX_PATCH_LENGTH` (default: `200000`)
 - `RATE_LIMIT_MAX_PER_MIN` (default: `120`)
+- `RATE_LIMIT_MAX_KEYS` (default: `10000`) — cap in-memory rate-limit key cardinality.
+- `RATE_LIMIT_CLEANUP_EVERY` (default: `100`) — prune expired rate-limit entries every N requests.
 - `ENABLE_HSTS` (default: `true`) — emit HSTS header on secure requests.
 
 ## DB resilience
@@ -39,6 +41,12 @@
 ## HTTP resilience (GitHub calls)
 - `HTTP_RETRY_ATTEMPTS` (default: `3`)
 - `HTTP_RETRY_BASE_MS` (default: `150`)
+- `HTTP_TIMEOUT_MS` (default: `10000`) — per-attempt request timeout.
+
+## Health monitor script controls (`ops/healthcheck.sh`)
+- `HC_MAX_ATTEMPTS` (default: `3`)
+- `HC_TIMEOUT_SEC` (default: `25`)
+- `HC_BACKOFF_BASE_SEC` (default: `2`)
 
 ## Recommended production baseline (cost-free)
 - Keep `ENFORCE_API_KEYS_IN_PROD=true` and configure separate read/write keys.
