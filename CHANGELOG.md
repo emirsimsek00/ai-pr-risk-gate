@@ -1,6 +1,13 @@
 # Changelog
 
-## [1.1.0] - 2026-02-24
+## [1.1.1] - 2026-03-03
+### Changed
+- README publishing polish:
+  - Added live service, dashboard, and latest release links
+  - Clarified Render production env vars and fail-closed auth settings
+- Release log maintenance: aligned recent release timeline
+
+## [1.1.0] - 2026-03-03
 ### Added
 - Sprint 3 production-positioning assets:
   - E2E smoke workflow (`.github/workflows/e2e-smoke.yml`)

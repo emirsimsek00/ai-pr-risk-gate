@@ -32,6 +32,11 @@ Backend service that scores pull requests for operational/security risk before m
 - Structured JSON request logging with request IDs
 - In-memory API rate limiting guardrails
 
+## Live links
+- Live service: https://ai-pr-risk-gate.onrender.com
+- Dashboard: https://ai-pr-risk-gate.onrender.com/dashboard
+- Latest release: https://github.com/emirsimsek00/ai-pr-risk-gate/releases/latest
+
 ## Quick start (local)
 ```bash
 npm install
@@ -150,9 +155,19 @@ This repo includes `render.yaml`.
 2. Set environment variables:
    - `DATABASE_URL`
    - `GITHUB_TOKEN` (fine-grained token with repo comment access)
-   - `GITHUB_WEBHOOK_SECRET` (optional for webhook path)
+   - `GITHUB_WEBHOOK_SECRET` (recommended for webhook path)
+   - `API_KEYS_JSON` (required in production when `ENFORCE_API_KEYS_IN_PROD=true`)
 3. Deploy.
 4. Add `RISK_GATE_URL` in your target GitHub repository secrets.
+
+Minimal production env example:
+```bash
+NODE_ENV=production
+ENFORCE_API_KEYS_IN_PROD=true
+ENFORCE_WEBHOOK_SECRET_IN_PROD=true
+ENABLE_HSTS=true
+TRUST_PROXY=true
+```
 
 ## Suggested recruiter demo flow
 1. Open a PR with auth/db/CI changes.
