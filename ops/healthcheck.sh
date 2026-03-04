@@ -7,10 +7,6 @@ HC_MAX_ATTEMPTS="${HC_MAX_ATTEMPTS:-3}"
 HC_TIMEOUT_SEC="${HC_TIMEOUT_SEC:-25}"
 HC_BACKOFF_BASE_SEC="${HC_BACKOFF_BASE_SEC:-2}"
 
-AUTH_HEADER=()
-if [[ -n "$API_KEY" ]]; then
-  AUTH_HEADER=(-H "x-api-key: ${API_KEY}")
-fi
 
 check_ok_json() {
   local json="$1"
@@ -73,20 +69,40 @@ echo "$ROOT_PAYLOAD" | grep -Eq "<title>AI PR Risk Gate</title>|AI PR Risk Gate|
 }
 
 echo "[healthcheck] Running analyze smoke test"
+ANALYZE_PAYLOAD='{"repo":"ai-pr-risk-gate","prNumber":1,"files":[{"filename":"src/auth/jwt.ts","patch":"+ const token = sign(payload, secret)"}]}'
+ANALYZE_TMP="$(mktemp)"
+trap 'rm -f "$ANALYZE_TMP"' EXIT
+
+ANALYZE_HTTP_CODE=""
 if [[ -n "$API_KEY" ]]; then
-  ANALYZE_RESP="$(curl -fsS --max-time "$HC_TIMEOUT_SEC" -X POST "${BASE_URL}/api/analyze" \
+  ANALYZE_HTTP_CODE="$(curl -sS --max-time "$HC_TIMEOUT_SEC" -o "$ANALYZE_TMP" -w '%{http_code}' -X POST "${BASE_URL}/api/analyze" \
     -H "x-api-key: ${API_KEY}" \
     -H 'content-type: application/json' \
-    --data '{"repo":"ai-pr-risk-gate","prNumber":1,"files":[{"filename":"src/auth/jwt.ts","patch":"+ const token = sign(payload, secret)"}]}'
-  )"
+    --data "$ANALYZE_PAYLOAD")"
 else
-  ANALYZE_RESP="$(curl -fsS --max-time "$HC_TIMEOUT_SEC" -X POST "${BASE_URL}/api/analyze" \
+  ANALYZE_HTTP_CODE="$(curl -sS --max-time "$HC_TIMEOUT_SEC" -o "$ANALYZE_TMP" -w '%{http_code}' -X POST "${BASE_URL}/api/analyze" \
     -H 'content-type: application/json' \
-    --data '{"repo":"ai-pr-risk-gate","prNumber":1,"files":[{"filename":"src/auth/jwt.ts","patch":"+ const token = sign(payload, secret)"}]}'
-  )"
+    --data "$ANALYZE_PAYLOAD")"
 fi
+
+ANALYZE_RESP="$(cat "$ANALYZE_TMP")"
+
+if [[ "$ANALYZE_HTTP_CODE" == "401" && -z "$API_KEY" ]]; then
+  echo "[healthcheck] Analyze endpoint requires API key (expected in production)."
+  echo "[healthcheck] Set API_KEY=<write-key> for full authenticated smoke test."
+  echo "[healthcheck] OK (public endpoints healthy; analyze auth enforced)"
+  exit 0
+fi
+
+if [[ "$ANALYZE_HTTP_CODE" != "200" ]]; then
+  echo "[healthcheck] Analyze smoke test failed (HTTP ${ANALYZE_HTTP_CODE})"
+  echo "$ANALYZE_RESP"
+  exit 1
+fi
+
 echo "$ANALYZE_RESP" | grep -q '"score"' || {
-  echo "[healthcheck] Analyze smoke test failed"
+  echo "[healthcheck] Analyze smoke test failed (missing score in response)"
+  echo "$ANALYZE_RESP"
   exit 1
 }
 
