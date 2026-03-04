@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import Aurora from "@/components/Aurora";
+import LightRays from "@/components/LightRays";
 
 type AnalyzeResponse = {
   score: number;
@@ -30,11 +30,23 @@ function getStoredKey(name: string) {
 function shell(children: ReactNode) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#070611] text-white">
-      <div className="pointer-events-none absolute inset-0 opacity-90">
-        <Aurora colorStops={["#e60fbf", "#6a59a1", "#5227FF"]} amplitude={1} blend={0.5} />
+      <div className="pointer-events-none absolute inset-0 opacity-95">
+        <LightRays
+          raysOrigin="bottom-center"
+          raysColor="#fafafa"
+          raysSpeed={1.5}
+          lightSpread={1.8}
+          rayLength={2.6}
+          followMouse={true}
+          mouseInfluence={0}
+          noiseAmount={0.31}
+          distortion={0}
+          className="custom-rays"
+          pulsating={false}
+          fadeDistance={1.7}
+          saturation={0.8}
+        />
       </div>
-      <div className="pointer-events-none absolute -left-32 top-10 h-80 w-80 rounded-full bg-fuchsia-500/20 blur-3xl" />
-      <div className="pointer-events-none absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-violet-500/20 blur-3xl" />
       <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-10">{children}</div>
     </div>
   );
