@@ -56,12 +56,12 @@ function Header({ dashboard, onSwitch }: { dashboard: boolean; onSwitch: (next: 
   return (
     <header className="mb-8 flex items-center justify-between gap-3">
       <div>
-        <p className="text-xs uppercase tracking-[0.35em] text-violet-200/80">AI Security Platform</p>
-        <h1 className="mt-2 bg-gradient-to-r from-fuchsia-200 via-violet-100 to-indigo-200 bg-clip-text text-4xl font-semibold tracking-tight text-transparent md:text-5xl">AI PR Risk Gate</h1>
+        <p className="text-xs uppercase tracking-[0.35em] text-zinc-200/80">AI Security Platform</p>
+        <h1 className="mt-2 bg-gradient-to-r from-zinc-200 via-stone-200 to-slate-200 bg-clip-text text-4xl font-semibold tracking-tight text-transparent md:text-5xl">AI PR Risk Gate</h1>
       </div>
       <div className="flex items-center gap-2">
-        <button onClick={() => onSwitch("analyzer")} className={`rounded-full border px-4 py-2 text-sm backdrop-blur ${!dashboard ? "border-violet-300/60 bg-violet-500/40" : "border-white/20 bg-white/10 hover:bg-white/20"}`}>Analyzer</button>
-        <button onClick={() => onSwitch("dashboard")} className={`rounded-full border px-4 py-2 text-sm backdrop-blur ${dashboard ? "border-violet-300/60 bg-violet-500/40" : "border-white/20 bg-white/10 hover:bg-white/20"}`}>Dashboard</button>
+        <button onClick={() => onSwitch("analyzer")} className={`rounded-full border px-4 py-2 text-sm backdrop-blur ${!dashboard ? "border-zinc-300/60 bg-zinc-500/30" : "border-white/20 bg-white/10 hover:bg-white/20"}`}>Analyzer</button>
+        <button onClick={() => onSwitch("dashboard")} className={`rounded-full border px-4 py-2 text-sm backdrop-blur ${dashboard ? "border-zinc-300/60 bg-zinc-500/30" : "border-white/20 bg-white/10 hover:bg-white/20"}`}>Dashboard</button>
         <a href="/openapi.yaml" className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm backdrop-blur hover:bg-white/20">API Spec</a>
       </div>
     </header>
@@ -116,11 +116,11 @@ function AnalyzerView() {
       <section className="rounded-2xl border border-white/15 bg-black/35 p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition duration-300 hover:-translate-y-0.5 hover:bg-black/40">
         <h2 className="mb-4 text-xl font-medium">Run a Risk Analysis</h2>
         <div className="space-y-3">
-          <label className="block text-sm text-violet-100/90">Repo<input value={repo} onChange={(e) => setRepo(e.target.value)} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
-          <label className="block text-sm text-violet-100/90">PR Number<input type="number" value={prNumber} onChange={(e) => setPrNumber(Number(e.target.value || 1))} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
-          <label className="block text-sm text-violet-100/90">Filename<input value={filename} onChange={(e) => setFilename(e.target.value)} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
-          <label className="block text-sm text-violet-100/90">Patch Snippet<textarea value={patch} onChange={(e) => setPatch(e.target.value)} className="mt-1 h-28 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
-          <label className="block text-sm text-violet-100/90">Write API Key (optional)
+          <label className="block text-sm text-zinc-100/90">Repo<input value={repo} onChange={(e) => setRepo(e.target.value)} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
+          <label className="block text-sm text-zinc-100/90">PR Number<input type="number" value={prNumber} onChange={(e) => setPrNumber(Number(e.target.value || 1))} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
+          <label className="block text-sm text-zinc-100/90">Filename<input value={filename} onChange={(e) => setFilename(e.target.value)} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
+          <label className="block text-sm text-zinc-100/90">Patch Snippet<textarea value={patch} onChange={(e) => setPatch(e.target.value)} className="mt-1 h-28 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
+          <label className="block text-sm text-zinc-100/90">Write API Key (optional)
             <input
               value={writeKey}
               onChange={(e) => {
@@ -135,24 +135,24 @@ function AnalyzerView() {
               className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2"
             />
           </label>
-          <button onClick={analyze} disabled={loading} className="w-full rounded-lg bg-violet-500 px-4 py-2 font-medium hover:bg-violet-400 disabled:opacity-60">{loading ? "Analyzing..." : "Analyze Risk"}</button>
+          <button onClick={analyze} disabled={loading} className="w-full rounded-lg bg-zinc-500 px-4 py-2 font-medium hover:bg-zinc-400 disabled:opacity-60">{loading ? "Analyzing..." : "Analyze Risk"}</button>
         </div>
       </section>
 
       <section className="rounded-2xl border border-white/15 bg-black/35 p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition duration-300 hover:-translate-y-0.5 hover:bg-black/40">
         <h2 className="mb-4 text-xl font-medium">Decision Panel</h2>
-        {!result && !error && <p className="text-violet-100/80">Run an analysis to see findings and recommendations.</p>}
+        {!result && !error && <p className="text-zinc-100/80">Run an analysis to see findings and recommendations.</p>}
         {error && <p className="rounded-lg border border-rose-300/40 bg-rose-500/20 p-3 text-rose-100">{error}</p>}
         {result && (
           <div className="space-y-4">
             <div className="rounded-xl border border-white/15 bg-white/5 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-              <p className="text-sm text-violet-100/70">Risk Score</p>
-              <p className="text-4xl font-semibold">{result.score}<span className="text-lg text-violet-200/80"> / 100</span></p>
+              <p className="text-sm text-zinc-100/70">Risk Score</p>
+              <p className="text-4xl font-semibold">{result.score}<span className="text-lg text-zinc-200/80"> / 100</span></p>
               <p className={`mt-1 text-sm font-semibold uppercase tracking-wide ${severityClass}`}>{result.severity}</p>
-              {result.policy && <p className="mt-2 text-xs text-violet-100/70">Policy: {result.policy.allowed ? "ALLOW" : `BLOCK (${result.policy.reason ?? "rule"})`}</p>}
+              {result.policy && <p className="mt-2 text-xs text-zinc-100/70">Policy: {result.policy.allowed ? "ALLOW" : `BLOCK (${result.policy.reason ?? "rule"})`}</p>}
             </div>
-            <div><h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-violet-100/80">Findings</h3><ul className="list-disc space-y-1 pl-5 text-sm text-violet-50/90">{result.findings.map((f) => <li key={f}>{f}</li>)}</ul></div>
-            <div><h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-violet-100/80">Recommendations</h3><ul className="list-disc space-y-1 pl-5 text-sm text-violet-50/90">{result.recommendations.map((r) => <li key={r}>{r}</li>)}</ul></div>
+            <div><h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-zinc-100/80">Findings</h3><ul className="list-disc space-y-1 pl-5 text-sm text-zinc-50/90">{result.findings.map((f) => <li key={f}>{f}</li>)}</ul></div>
+            <div><h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-zinc-100/80">Recommendations</h3><ul className="list-disc space-y-1 pl-5 text-sm text-zinc-50/90">{result.recommendations.map((r) => <li key={r}>{r}</li>)}</ul></div>
           </div>
         )}
       </section>
@@ -168,14 +168,14 @@ function GuideView() {
   return (
     <section className="rounded-2xl border border-white/15 bg-black/35 p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
       <h2 className="mb-3 text-2xl font-semibold">How to Use This Product</h2>
-      <ol className="list-decimal space-y-2 pl-6 text-sm text-violet-50/95">
+      <ol className="list-decimal space-y-2 pl-6 text-sm text-zinc-50/95">
         <li>Start in <strong>Analyzer</strong>. Enter a repo, PR number, filename, and patch snippet, then click <strong>Analyze Risk</strong>.</li>
         <li>Read the <strong>Risk Score</strong>, severity, findings, and recommendations. If policy blocks the PR, address the listed findings first.</li>
         <li>Open <strong>Dashboard</strong> to monitor trends over time: average risk, high/critical counts, recurring findings, and recent assessments.</li>
         <li>Use the dashboard filters (repo + date range) to review one repository or your broader team activity.</li>
         <li>For CI integration, call <code>POST /api/analyze</code> from your workflow; use dashboard metrics to tune your risk policy thresholds.</li>
       </ol>
-      <p className="mt-3 text-xs text-violet-200/80">Tip: if your API is protected with API keys, make sure your frontend/session includes a read key for dashboard endpoints and a write key for analyze endpoints.</p>
+      <p className="mt-3 text-xs text-zinc-200/80">Tip: if your API is protected with API keys, make sure your frontend/session includes a read key for dashboard endpoints and a write key for analyze endpoints.</p>
     </section>
   );
 }
@@ -255,7 +255,7 @@ function DashboardView() {
               }
               load();
             }}
-            className="rounded-lg bg-violet-500 px-3 py-2 text-sm font-medium hover:bg-violet-400"
+            className="rounded-lg bg-zinc-500 px-3 py-2 text-sm font-medium hover:bg-zinc-400"
           >
             Apply
           </button>
@@ -270,7 +270,7 @@ function DashboardView() {
           ["High/Critical", String(highCount)]
         ].map(([k, v]) => (
           <div key={k} className="rounded-2xl border border-white/15 bg-black/35 p-4 backdrop-blur-xl shadow-[0_16px_40px_rgba(0,0,0,0.3)] transition duration-300 hover:-translate-y-0.5 hover:bg-black/40">
-            <p className="text-xs uppercase tracking-wider text-violet-100/70">{k}</p>
+            <p className="text-xs uppercase tracking-wider text-zinc-100/70">{k}</p>
             <p className="mt-2 text-3xl font-semibold">{v}</p>
           </div>
         ))}
@@ -280,11 +280,11 @@ function DashboardView() {
         <div className="rounded-2xl border border-white/15 bg-black/35 p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition duration-300 hover:-translate-y-0.5 hover:bg-black/40">
           <h3 className="mb-3 text-lg font-medium">Risk Trend</h3>
           <div className="flex h-48 items-end gap-2 border-t border-white/10 pt-3">
-            {trends.length === 0 && <p className="text-sm text-violet-100/70">No trend data yet.</p>}
+            {trends.length === 0 && <p className="text-sm text-zinc-100/70">No trend data yet.</p>}
             {trends.map((t) => {
               const max = Math.max(...trends.map((x) => Number(x.avgScore) || 0), 1);
               const h = Math.max(8, Math.round(((Number(t.avgScore) || 0) / max) * 170));
-              return <div key={t.day} className="group flex-1 rounded-t bg-gradient-to-t from-violet-700 to-fuchsia-400 transition-all duration-300 hover:from-fuchsia-500 hover:to-violet-300" style={{ height: `${h}px` }} title={`${t.day}: ${t.avgScore}`} />;
+              return <div key={t.day} className="group flex-1 rounded-t bg-gradient-to-t from-zinc-700 to-slate-400 transition-all duration-300 hover:from-slate-500 hover:to-zinc-300" style={{ height: `${h}px` }} title={`${t.day}: ${t.avgScore}`} />;
             })}
           </div>
         </div>
@@ -293,7 +293,7 @@ function DashboardView() {
           <h3 className="mb-3 text-lg font-medium">Severity Distribution</h3>
           <ul className="space-y-2 text-sm">
             {severity.map((s) => <li key={s.severity} className="flex justify-between border-b border-white/10 pb-2"><span className="uppercase">{s.severity}</span><span>{s.count}</span></li>)}
-            {severity.length === 0 && <li className="text-violet-100/70">No data.</li>}
+            {severity.length === 0 && <li className="text-zinc-100/70">No data.</li>}
           </ul>
         </div>
       </section>
@@ -303,7 +303,7 @@ function DashboardView() {
           <h3 className="mb-3 text-lg font-medium">Recent Assessments</h3>
           <div className="space-y-2 text-sm">
             {rows.map((r) => <div key={r.id} className="grid grid-cols-5 gap-2 border-b border-white/10 pb-2"><span className="col-span-2">{new Date(r.created_at).toLocaleString()}</span><span>{r.repo}</span><span>#{r.pr_number}</span><span>{r.score}</span></div>)}
-            {rows.length === 0 && <p className="text-violet-100/70">No data.</p>}
+            {rows.length === 0 && <p className="text-zinc-100/70">No data.</p>}
           </div>
         </div>
 
@@ -311,7 +311,7 @@ function DashboardView() {
           <h3 className="mb-3 text-lg font-medium">Top Findings</h3>
           <ul className="space-y-2 text-sm">
             {findings.map((f) => <li key={f.finding} className="flex justify-between border-b border-white/10 pb-2"><span>{f.finding}</span><span>{f.count}</span></li>)}
-            {findings.length === 0 && <li className="text-violet-100/70">No data.</li>}
+            {findings.length === 0 && <li className="text-zinc-100/70">No data.</li>}
           </ul>
         </div>
       </section>
