@@ -31,6 +31,7 @@ Backend service that scores pull requests for operational/security risk before m
 - Professional metrics dashboard at `/dashboard` (repo filter + trend visuals)
 - Structured JSON request logging with request IDs
 - In-memory API rate limiting guardrails
+- Optional self-serve onboarding endpoint for scoped write-key issuance (`/api/onboarding/issue-key`)
 
 ## Live links
 - Live service: https://ai-pr-risk-gate.onrender.com

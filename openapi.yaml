@@ -137,6 +137,27 @@ paths:
       responses:
         '200':
           description: Finding counts
+  /api/onboarding/issue-key:
+    post:
+      tags: [Analysis]
+      summary: Issue a scoped write API key (self-serve onboarding)
+      description: Disabled by default; when enabled, issues a repo-scoped write key with expiry.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repo]
+              properties:
+                repo: { type: string }
+                ownerLabel: { type: string }
+      responses:
+        '201': { description: Key issued }
+        '400': { description: Invalid request }
+        '403': { description: Repo not allowed }
+        '404': { description: Onboarding disabled }
+        '429': { description: Rate limit exceeded }
   /webhook/github:
     post:
       tags: [Webhooks]

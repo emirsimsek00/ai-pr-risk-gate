@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { evaluateRisk } from "./riskEngine.js";
 import {
   checkDbReady,
+  createApiKey,
+  findActiveApiKeyByToken,
   getRecentAssessments,
   getRiskTrends,
   getSeverityDistribution,
@@ -48,6 +50,17 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX_PER_MIN ?? 120);
 const RATE_LIMIT_MAX_KEYS = Number(process.env.RATE_LIMIT_MAX_KEYS ?? 10_000);
 const RATE_LIMIT_CLEANUP_EVERY = Number(process.env.RATE_LIMIT_CLEANUP_EVERY ?? 100);
 let rateLimitReqCounter = 0;
+
+const ENABLE_SELF_SERVE_ONBOARDING = (process.env.ENABLE_SELF_SERVE_ONBOARDING ?? "false") === "true";
+const ONBOARDING_ALLOWED_REPOS = new Set(
+  (process.env.ONBOARDING_ALLOWED_REPOS ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean)
+);
+const ONBOARDING_KEY_TTL_DAYS = Number(process.env.ONBOARDING_KEY_TTL_DAYS ?? 30);
+const ONBOARDING_MAX_ISSUES_PER_IP_PER_DAY = Number(process.env.ONBOARDING_MAX_ISSUES_PER_IP_PER_DAY ?? 3);
+const onboardingIssuesByIp = new Map<string, { count: number; resetAt: number }>();
 
 app.use((req, res, next) => {
   const requestId = crypto.randomUUID();
@@ -207,8 +220,15 @@ function secureTokenEqual(a: string, b: string) {
   return crypto.timingSafeEqual(aBuf, bBuf);
 }
 
-function findApiKeyConfig(token: string) {
+function findEnvApiKeyConfig(token: string) {
   return apiKeys.find((k) => secureTokenEqual(k.key, token));
+}
+
+async function findAnyApiKeyConfig(token: string) {
+  const envKey = findEnvApiKeyConfig(token);
+  if (envKey) return envKey;
+  const dbKey = await findActiveApiKeyByToken(token);
+  return dbKey ? { role: dbKey.role, repos: dbKey.repos ?? [] } : null;
 }
 
 function pruneRateLimiter(now: number) {
@@ -224,20 +244,41 @@ function pruneRateLimiter(now: number) {
   }
 }
 
-function canAccessRepo(config: ApiKeyConfig, repo?: string) {
+function canAccessRepo(config: ApiKeyConfig | { repos?: string[] | null }, repo?: string) {
   if (!config.repos || config.repos.length === 0 || config.repos.includes("*")) return true;
   if (!repo) return true;
   return config.repos.includes(repo);
 }
 
+function isRepoAllowedForOnboarding(repo: string) {
+  if (ONBOARDING_ALLOWED_REPOS.size === 0) return true;
+  return ONBOARDING_ALLOWED_REPOS.has(repo) || ONBOARDING_ALLOWED_REPOS.has("*");
+}
+
+function checkAndIncrementOnboardingLimit(ip: string) {
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const entry = onboardingIssuesByIp.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    onboardingIssuesByIp.set(ip, { count: 1, resetAt: now + dayMs });
+    return true;
+  }
+
+  if (entry.count >= ONBOARDING_MAX_ISSUES_PER_IP_PER_DAY) return false;
+  entry.count += 1;
+  return true;
+}
+
 function requireApiRole(role: ApiRole) {
-  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (apiKeys.length === 0) return next();
+  return asyncHandler(async (req, res, next) => {
+    const hasConfiguredAuth = apiKeys.length > 0 || ENABLE_SELF_SERVE_ONBOARDING;
+    if (!hasConfiguredAuth) return next();
 
     const token = extractApiKey(req);
     if (!token) return res.status(401).json({ error: "missing API key" });
 
-    const key = findApiKeyConfig(token);
+    const key = await findAnyApiKeyConfig(token);
     if (!key) return res.status(401).json({ error: "invalid API key" });
 
     if (role === "write" && key.role !== "write") return res.status(403).json({ error: "write access required" });
@@ -249,26 +290,26 @@ function requireApiRole(role: ApiRole) {
     if (!canAccessRepo(key, repo)) return res.status(403).json({ error: "repo access denied" });
 
     return next();
-  };
+  });
 }
 
-function requireWebhookAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (apiKeys.length === 0) return next();
+const requireWebhookAccess = asyncHandler(async (req, res, next) => {
+  const secretConfigured = Boolean(process.env.GITHUB_WEBHOOK_SECRET);
+  const hasApiAuth = apiKeys.length > 0 || ENABLE_SELF_SERVE_ONBOARDING;
+  if (!secretConfigured && !hasApiAuth) return next();
 
   const token = extractApiKey(req);
   if (token) {
-    const key = findApiKeyConfig(token);
+    const key = await findAnyApiKeyConfig(token);
     if (key?.role === "write") return next();
   }
 
   const rawBody = (req as express.Request & { rawBody?: Buffer }).rawBody;
   const sig = req.header("x-hub-signature-256") || undefined;
-  const secretConfigured = Boolean(process.env.GITHUB_WEBHOOK_SECRET);
-
   if (secretConfigured && rawBody && validSignature(rawBody, sig)) return next();
 
   return res.status(401).json({ error: "webhook auth required" });
-}
+});
 
 function validSignature(payload: Buffer, signatureHeader?: string) {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
@@ -433,6 +474,47 @@ app.get("/api/findings", requireApiRole("read"), asyncHandler(async (req, res) =
   const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
   const rows = await getTopFindings(safeDays, repo, 8);
   return res.json({ repo: repo ?? "all", days: safeDays, rows });
+}));
+
+app.post("/api/onboarding/issue-key", asyncHandler(async (req, res) => {
+  if (!ENABLE_SELF_SERVE_ONBOARDING) {
+    return res.status(404).json({ error: "self-serve onboarding is disabled" });
+  }
+
+  const repo = typeof (req.body as { repo?: unknown })?.repo === "string" ? (req.body as { repo: string }).repo.trim() : "";
+  const ownerLabel = typeof (req.body as { ownerLabel?: unknown })?.ownerLabel === "string"
+    ? (req.body as { ownerLabel: string }).ownerLabel.trim().slice(0, 120)
+    : "self-serve";
+
+  if (!repo || !REPO_NAME_PATTERN.test(repo)) {
+    return res.status(400).json({ error: "repo is required and must match [A-Za-z0-9._-]" });
+  }
+
+  if (!isRepoAllowedForOnboarding(repo)) {
+    return res.status(403).json({ error: "repo is not allowed for self-serve onboarding" });
+  }
+
+  const ip = req.ip || "unknown";
+  if (!checkAndIncrementOnboardingLimit(ip)) {
+    return res.status(429).json({ error: "daily onboarding key limit reached for this IP" });
+  }
+
+  const issued = await createApiKey({
+    role: "write",
+    repos: [repo],
+    ownerLabel,
+    expiresInDays: ONBOARDING_KEY_TTL_DAYS
+  });
+
+  logEvent("info", req, "self-serve key issued", { repo, ownerLabel, expiresAt: issued.key.expiresAt });
+
+  return res.status(201).json({
+    key: issued.token,
+    role: issued.key.role,
+    repos: issued.key.repos,
+    expiresAt: issued.key.expiresAt,
+    warning: "Store this key now. It will not be shown again."
+  });
 }));
 
 const analyzeHandler = async (req: express.Request, res: express.Response) => {

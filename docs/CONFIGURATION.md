@@ -24,6 +24,13 @@
 - `CORS_ORIGINS` — comma-separated allowlist for browser origins.
 - `TRUST_PROXY` — optional Express trust proxy setting (`true`/`false`/hop count/value).
 
+## Self-serve onboarding (DB-backed key issuance)
+- `ENABLE_SELF_SERVE_ONBOARDING` (default: `false`) — enable `POST /api/onboarding/issue-key`.
+- `ONBOARDING_ALLOWED_REPOS` — comma-separated repo allowlist for self-serve issuance. Empty means any repo.
+- `ONBOARDING_KEY_TTL_DAYS` (default: `30`) — lifetime for issued keys.
+- `ONBOARDING_MAX_ISSUES_PER_IP_PER_DAY` (default: `3`) — per-IP issuance cap.
+- Requires Postgres (`DATABASE_URL`) and migration `002_api_keys.sql`.
+
 ## Request safety limits
 - `MAX_FILES_PER_REQUEST` (default: `500`)
 - `MAX_FILENAME_LENGTH` (default: `300`)

@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import { Pool, type QueryResult } from "pg";
 
 const connectionString = process.env.DATABASE_URL;
@@ -20,7 +21,7 @@ function isRetriableDbError(error: unknown) {
   return ["40001", "40P01", "53300", "08000", "08003", "08006"].includes(code);
 }
 
-async function queryWithTimeout(query: string, params: Array<string | number>): Promise<QueryResult> {
+async function queryWithTimeout(query: string, params: Array<string | number | null>): Promise<QueryResult> {
   if (!db) throw new Error("database is not configured");
 
   let lastError: unknown;
@@ -210,5 +211,81 @@ export async function getTopFindings(days = 30, repo?: string, limit = 8) {
     return result.rows as Array<{ finding: string; count: number }>;
   } catch {
     return [] as Array<{ finding: string; count: number }>;
+  }
+}
+
+export type StoredApiKey = {
+  id: string;
+  role: "read" | "write";
+  repos: string[] | null;
+  ownerLabel: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+};
+
+function hashApiKeyToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export function generateApiKeyToken() {
+  return `rk_${randomBytes(24).toString("base64url")}`;
+}
+
+export async function createApiKey(input: {
+  role: "read" | "write";
+  repos?: string[];
+  ownerLabel?: string;
+  expiresInDays?: number;
+}) {
+  if (!db) throw new Error("database is not configured");
+
+  const token = generateApiKeyToken();
+  const tokenHash = hashApiKeyToken(token);
+  const repos = input.repos?.length ? JSON.stringify(input.repos) : null;
+  const ownerLabel = input.ownerLabel ?? null;
+  const expiresInDays = Math.max(1, Math.min(input.expiresInDays ?? 30, 365));
+
+  const result = await queryWithTimeout(
+    `insert into api_keys (token_hash, role, repos, owner_label, expires_at)
+     values ($1, $2, $3::jsonb, $4, now() + ($5::text || ' days')::interval)
+     returning id::text as id, role, coalesce(repos, '[]'::jsonb) as repos, owner_label as "ownerLabel", expires_at as "expiresAt", revoked_at as "revokedAt"`,
+    [tokenHash, input.role, repos, ownerLabel, expiresInDays]
+  );
+
+  const row = result.rows[0] as StoredApiKey & { repos: unknown };
+  const stored: StoredApiKey = {
+    ...row,
+    repos: Array.isArray(row.repos) ? (row.repos as string[]) : []
+  };
+
+  return { token, key: stored };
+}
+
+export async function findActiveApiKeyByToken(token: string) {
+  if (!db) return null;
+  const tokenHash = hashApiKeyToken(token);
+
+  try {
+    const result = await queryWithTimeout(
+      `select id::text as id, role, coalesce(repos, '[]'::jsonb) as repos, owner_label as "ownerLabel", expires_at as "expiresAt", revoked_at as "revokedAt"
+       from api_keys
+       where token_hash = $1
+         and revoked_at is null
+         and (expires_at is null or expires_at > now())
+       limit 1`,
+      [tokenHash]
+    );
+
+    if (result.rows.length === 0) return null;
+    const row = result.rows[0] as StoredApiKey & { repos: unknown };
+
+    await queryWithTimeout("update api_keys set last_used_at = now() where id = $1", [row.id]);
+
+    return {
+      ...row,
+      repos: Array.isArray(row.repos) ? (row.repos as string[]) : []
+    } as StoredApiKey;
+  } catch {
+    return null;
   }
 }

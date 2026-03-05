@@ -77,6 +77,7 @@ function AnalyzerView() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [writeKey, setWriteKey] = useState(getStoredKey("riskgate_write_key"));
+  const [issuingKey, setIssuingKey] = useState(false);
 
   const severityClass = useMemo(() => {
     if (!result) return "";
@@ -84,6 +85,27 @@ function AnalyzerView() {
     if (result.severity === "medium") return "text-amber-300";
     return "text-rose-300";
   }, [result]);
+
+  async function issueWriteKey() {
+    setIssuingKey(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/onboarding/issue-key", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ repo, ownerLabel: "self-serve-ui" })
+      });
+      const data = await res.json();
+      if (!res.ok) return setError(data.error ?? "Could not issue key");
+      const issued = String(data.key ?? "");
+      setWriteKey(issued);
+      if (typeof window !== "undefined") window.sessionStorage.setItem("riskgate_write_key", issued);
+    } catch {
+      setError("Failed to issue self-serve key.");
+    } finally {
+      setIssuingKey(false);
+    }
+  }
 
   async function analyze() {
     setLoading(true);
@@ -135,6 +157,9 @@ function AnalyzerView() {
               className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2"
             />
           </label>
+          <button onClick={issueWriteKey} disabled={issuingKey} className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-2 font-medium hover:bg-white/20 disabled:opacity-60">
+            {issuingKey ? "Issuing key..." : "Issue Self-Serve Write Key"}
+          </button>
           <button onClick={analyze} disabled={loading} className="w-full rounded-lg bg-zinc-500 px-4 py-2 font-medium hover:bg-zinc-400 disabled:opacity-60">{loading ? "Analyzing..." : "Analyze Risk"}</button>
         </div>
       </section>
