@@ -60,6 +60,7 @@ const ONBOARDING_ALLOWED_REPOS = new Set(
 );
 const ONBOARDING_KEY_TTL_DAYS = Number(process.env.ONBOARDING_KEY_TTL_DAYS ?? 30);
 const ONBOARDING_MAX_ISSUES_PER_IP_PER_DAY = Number(process.env.ONBOARDING_MAX_ISSUES_PER_IP_PER_DAY ?? 3);
+const ENABLE_PR_COMMENTS = (process.env.ENABLE_PR_COMMENTS ?? "true") === "true";
 const onboardingIssuesByIp = new Map<string, { count: number; resetAt: number }>();
 
 app.use((req, res, next) => {
@@ -613,16 +614,25 @@ app.post("/api/analyze/pr-link", requireApiRole("write"), asyncHandler(async (re
     }
 
     const { result, policy } = await runRiskAssessment({ repo, owner, prNumber, files });
+    const warnings: string[] = [];
 
-    await postPRComment({
-      owner,
-      repo,
-      prNumber,
-      body: [
-        formatComment(result.score, result.severity, result.findings, result.recommendations),
-        `\n- **Policy gate:** ${policy.allowed ? "ALLOW ✅" : `BLOCK ❌ (${policy.reason})`}`
-      ].join("\n")
-    });
+    if (ENABLE_PR_COMMENTS) {
+      try {
+        await postPRComment({
+          owner,
+          repo,
+          prNumber,
+          body: [
+            formatComment(result.score, result.severity, result.findings, result.recommendations),
+            `\n- **Policy gate:** ${policy.allowed ? "ALLOW ✅" : `BLOCK ❌ (${policy.reason})`}`
+          ].join("\n")
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "unknown error";
+        warnings.push(`analysis succeeded but failed to post PR comment: ${detail}`);
+        logEvent("error", req, "pr-link comment failed", { owner, repo, prNumber, detail });
+      }
+    }
 
     logEvent("info", req, "pr-link analysis complete", {
       owner,
@@ -630,14 +640,16 @@ app.post("/api/analyze/pr-link", requireApiRole("write"), asyncHandler(async (re
       prNumber,
       score: result.score,
       severity: result.severity,
-      policyAllowed: policy.allowed
+      policyAllowed: policy.allowed,
+      warnings
     });
 
     return res.status(policy.allowed ? 200 : 409).json({
       ...result,
       policy,
       source: "pr-link",
-      pr: { owner, repo, prNumber }
+      pr: { owner, repo, prNumber },
+      ...(warnings.length > 0 ? { warnings } : {})
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown error";
@@ -651,7 +663,7 @@ app.post("/api/analyze/pr-link", requireApiRole("write"), asyncHandler(async (re
       return res.status(429).json({ error: "GitHub API rate limit reached; try again shortly" });
     }
 
-    return res.status(502).json({ error: "failed to fetch pull request files", detail });
+    return res.status(502).json({ error: "analysis pipeline failed", detail });
   }
 }));
 
