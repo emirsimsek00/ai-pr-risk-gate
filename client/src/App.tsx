@@ -211,7 +211,7 @@ function AnalyzerView() {
                   className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2"
                 />
               </label>
-              <p className="text-xs text-zinc-200/80">Paste a public GitHub PR link. We fetch changed files automatically for a more user-friendly analysis flow.</p>
+              <p className="text-xs text-zinc-200/80">Paste a public GitHub PR link. We fetch changed files automatically, and if self-serve onboarding is enabled, write-key issuance happens in the background.</p>
             </>
           ) : (
             <>
@@ -221,24 +221,28 @@ function AnalyzerView() {
               <label className="block text-sm text-zinc-100/90">Patch Snippet<textarea value={patch} onChange={(e) => setPatch(e.target.value)} className="mt-1 h-28 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
             </>
           )}
-          <label className="block text-sm text-zinc-100/90">Write API Key (required when API auth is enabled)
-            <input
-              value={writeKey}
-              onChange={(e) => {
-                setWriteKey(e.target.value);
-                if (typeof window !== "undefined") {
-                  if (e.target.value.trim()) window.sessionStorage.setItem("riskgate_write_key", e.target.value.trim());
-                  else window.sessionStorage.removeItem("riskgate_write_key");
-                }
-              }}
-              placeholder="needed when API auth is enabled"
-              title="Use a write key for analyze endpoints; stored only in this tab session."
-              className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2"
-            />
-          </label>
-          <button onClick={() => { void issueWriteKey(); }} disabled={issuingKey} className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-2 font-medium hover:bg-white/20 disabled:opacity-60">
-            {issuingKey ? "Issuing key..." : "Issue Self-Serve Write Key"}
-          </button>
+          {mode === "manual" && (
+            <>
+              <label className="block text-sm text-zinc-100/90">Write API Key (required when API auth is enabled)
+                <input
+                  value={writeKey}
+                  onChange={(e) => {
+                    setWriteKey(e.target.value);
+                    if (typeof window !== "undefined") {
+                      if (e.target.value.trim()) window.sessionStorage.setItem("riskgate_write_key", e.target.value.trim());
+                      else window.sessionStorage.removeItem("riskgate_write_key");
+                    }
+                  }}
+                  placeholder="needed when API auth is enabled"
+                  title="Use a write key for analyze endpoints; stored only in this tab session."
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2"
+                />
+              </label>
+              <button onClick={() => { void issueWriteKey(); }} disabled={issuingKey} className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-2 font-medium hover:bg-white/20 disabled:opacity-60">
+                {issuingKey ? "Issuing key..." : "Issue Self-Serve Write Key"}
+              </button>
+            </>
+          )}
           <button onClick={analyze} disabled={loading} className="w-full rounded-lg bg-zinc-500 px-4 py-2 font-medium hover:bg-zinc-400 disabled:opacity-60">{loading ? "Analyzing..." : "Analyze Risk"}</button>
         </div>
       </section>
