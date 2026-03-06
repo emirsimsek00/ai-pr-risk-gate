@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState, useRef } from "react";
 import LightRays from "@/components/LightRays";
 
 type AnalyzeResponse = {
@@ -95,6 +95,7 @@ function AnalyzerView() {
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [writeKey, setWriteKey] = useState(getStoredKey("riskgate_write_key"));
   const [issuingKey, setIssuingKey] = useState(false);
+  const autoIssueAttemptedRef = useRef(false);
 
   const severityClass = useMemo(() => {
     if (!result) return "";
@@ -103,15 +104,18 @@ function AnalyzerView() {
     return "text-rose-300";
   }, [result]);
 
-  async function issueWriteKey() {
+  async function issueWriteKey(options?: { silent?: boolean }) {
+    const silent = options?.silent === true;
+
     setIssuingKey(true);
-    setError(null);
+    if (!silent) setError(null);
+
     try {
       const parsed = parseGithubPrUrl(prUrl);
       const targetRepo = mode === "pr-link" ? (parsed?.repo ?? "") : repo;
       if (!targetRepo.trim()) {
-        setError(mode === "pr-link" ? "Enter a valid GitHub PR URL first." : "Repo is required to issue a key.");
-        return;
+        if (!silent) setError(mode === "pr-link" ? "Enter a valid GitHub PR URL first." : "Repo is required to issue a key.");
+        return null;
       }
 
       const res = await fetch("/api/onboarding/issue-key", {
@@ -120,12 +124,23 @@ function AnalyzerView() {
         body: JSON.stringify({ repo: targetRepo, ownerLabel: "self-serve-ui" })
       });
       const data = await res.json();
-      if (!res.ok) return setError(data.error ?? "Could not issue key");
+      if (!res.ok) {
+        if (!silent) setError(data.error ?? "Could not issue key");
+        return null;
+      }
+
       const issued = String(data.key ?? "");
+      if (!issued.trim()) {
+        if (!silent) setError("Onboarding response did not include a key.");
+        return null;
+      }
+
       setWriteKey(issued);
       if (typeof window !== "undefined") window.sessionStorage.setItem("riskgate_write_key", issued);
+      return issued;
     } catch {
-      setError("Failed to issue self-serve key.");
+      if (!silent) setError("Failed to issue self-serve key.");
+      return null;
     } finally {
       setIssuingKey(false);
     }
@@ -136,9 +151,17 @@ function AnalyzerView() {
     setError(null);
     setResult(null);
     try {
+      let keyToUse = writeKey.trim();
+
+      if (!keyToUse && !autoIssueAttemptedRef.current) {
+        autoIssueAttemptedRef.current = true;
+        const issued = await issueWriteKey({ silent: true });
+        if (issued) keyToUse = issued.trim();
+      }
+
       const headers: HeadersInit = {
         "content-type": "application/json",
-        ...(writeKey.trim() ? { "x-api-key": writeKey.trim() } : {})
+        ...(keyToUse ? { "x-api-key": keyToUse } : {})
       };
 
       const endpoint = mode === "pr-link" ? "/api/analyze/pr-link" : "/api/analyze";
@@ -148,7 +171,12 @@ function AnalyzerView() {
 
       const res = await fetch(endpoint, { method: "POST", headers, body });
       const data = await res.json();
-      if (!res.ok) return setError(data.error ?? "Request failed");
+      if (!res.ok) {
+        if (res.status === 401 && !keyToUse) {
+          return setError("Write API key required. Auto-issue may be disabled in this deployment.");
+        }
+        return setError(data.error ?? "Request failed");
+      }
       setResult(data);
     } catch {
       setError("Network error while analyzing this PR");
@@ -208,7 +236,7 @@ function AnalyzerView() {
               className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2"
             />
           </label>
-          <button onClick={issueWriteKey} disabled={issuingKey} className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-2 font-medium hover:bg-white/20 disabled:opacity-60">
+          <button onClick={() => { void issueWriteKey(); }} disabled={issuingKey} className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-2 font-medium hover:bg-white/20 disabled:opacity-60">
             {issuingKey ? "Issuing key..." : "Issue Self-Serve Write Key"}
           </button>
           <button onClick={analyze} disabled={loading} className="w-full rounded-lg bg-zinc-500 px-4 py-2 font-medium hover:bg-zinc-400 disabled:opacity-60">{loading ? "Analyzing..." : "Analyze Risk"}</button>
