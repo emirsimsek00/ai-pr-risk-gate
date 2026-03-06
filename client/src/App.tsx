@@ -193,7 +193,7 @@ function AnalyzerView() {
               <label className="block text-sm text-zinc-100/90">Patch Snippet<textarea value={patch} onChange={(e) => setPatch(e.target.value)} className="mt-1 h-28 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
             </>
           )}
-          <label className="block text-sm text-zinc-100/90">Write API Key (optional)
+          <label className="block text-sm text-zinc-100/90">Write API Key (required when API auth is enabled)
             <input
               value={writeKey}
               onChange={(e) => {
