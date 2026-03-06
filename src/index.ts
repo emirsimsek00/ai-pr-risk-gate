@@ -139,6 +139,10 @@ type AnalyzeRequest = {
   files: ChangedFile[];
 };
 
+type AnalyzePrLinkRequest = {
+  url: string;
+};
+
 const MAX_FILES_PER_REQUEST = Number(process.env.MAX_FILES_PER_REQUEST ?? 500);
 const MAX_FILENAME_LENGTH = Number(process.env.MAX_FILENAME_LENGTH ?? 300);
 const MAX_PATCH_LENGTH = Number(process.env.MAX_PATCH_LENGTH ?? 200_000);
@@ -376,6 +380,47 @@ function validateAnalyzeRequest(body: AnalyzeRequest) {
 
 type WebhookPRContext = { action: "opened" | "synchronize" | "reopened"; owner: string; repo: string; prNumber: number };
 
+type ParsedGithubPrUrl = { owner: string; repo: string; prNumber: number };
+
+function parseGitHubPullRequestUrl(rawUrl: string): ParsedGithubPrUrl | null {
+  const candidate = rawUrl.trim();
+  if (!candidate) return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    return null;
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (host !== "github.com" && host !== "www.github.com") return null;
+
+  const segments = parsed.pathname.split("/").filter(Boolean);
+  if (segments.length < 4) return null;
+
+  const [owner, repo, pullToken, prRaw] = segments;
+  if (pullToken !== "pull") return null;
+  if (!OWNER_NAME_PATTERN.test(owner) || !REPO_NAME_PATTERN.test(repo)) return null;
+  const prNumber = Number(prRaw);
+  if (!Number.isInteger(prNumber) || prNumber <= 0) return null;
+
+  return { owner, repo, prNumber };
+}
+
+function parseAnalyzePrLinkRequest(body: unknown) {
+  if (!body || typeof body !== "object") return { error: "invalid request body" as const };
+  const url = typeof (body as AnalyzePrLinkRequest).url === "string" ? (body as AnalyzePrLinkRequest).url : "";
+  const parsed = parseGitHubPullRequestUrl(url);
+  if (!parsed) {
+    return {
+      error: "url must be a valid GitHub pull request link (https://github.com/<owner>/<repo>/pull/<number>)" as const
+    };
+  }
+
+  return { parsed };
+}
+
 function parseWebhookPRContext(payload: unknown): WebhookPRContext | null {
   if (!payload || typeof payload !== "object") return null;
 
@@ -551,6 +596,64 @@ const analyzeHandler = async (req: express.Request, res: express.Response) => {
 
 app.post("/analyze", requireApiRole("write"), asyncHandler(analyzeHandler));
 app.post("/api/analyze", requireApiRole("write"), asyncHandler(analyzeHandler));
+
+app.post("/api/analyze/pr-link", requireApiRole("write"), asyncHandler(async (req, res) => {
+  const parsedRequest = parseAnalyzePrLinkRequest(req.body);
+  if ("error" in parsedRequest) {
+    logEvent("error", req, "pr-link validation failed", { validationError: parsedRequest.error });
+    return res.status(400).json({ error: parsedRequest.error });
+  }
+
+  const { owner, repo, prNumber } = parsedRequest.parsed;
+
+  try {
+    const files = await fetchPullRequestFiles({ owner, repo, prNumber, allowUnauthenticated: true });
+    if (files.length === 0) {
+      return res.status(422).json({ error: "pull request has no changed files to analyze" });
+    }
+
+    const { result, policy } = await runRiskAssessment({ repo, owner, prNumber, files });
+
+    await postPRComment({
+      owner,
+      repo,
+      prNumber,
+      body: [
+        formatComment(result.score, result.severity, result.findings, result.recommendations),
+        `\n- **Policy gate:** ${policy.allowed ? "ALLOW ✅" : `BLOCK ❌ (${policy.reason})`}`
+      ].join("\n")
+    });
+
+    logEvent("info", req, "pr-link analysis complete", {
+      owner,
+      repo,
+      prNumber,
+      score: result.score,
+      severity: result.severity,
+      policyAllowed: policy.allowed
+    });
+
+    return res.status(policy.allowed ? 200 : 409).json({
+      ...result,
+      policy,
+      source: "pr-link",
+      pr: { owner, repo, prNumber }
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "unknown error";
+    logEvent("error", req, "pr-link analysis failed", { owner, repo, prNumber, detail });
+
+    if (detail.includes("GitHub API error 404")) {
+      return res.status(404).json({ error: "pull request not found or not accessible" });
+    }
+
+    if (detail.includes("GitHub API error 403")) {
+      return res.status(429).json({ error: "GitHub API rate limit reached; try again shortly" });
+    }
+
+    return res.status(502).json({ error: "failed to fetch pull request files", detail });
+  }
+}));
 
 app.post("/webhook/github", requireWebhookAccess, asyncHandler(async (req, res) => {
   try {

@@ -1,8 +1,12 @@
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { app } from "./index.js";
 
 describe("api integration", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("returns health", async () => {
     const res = await request(app).get("/health");
     expect(res.status).toBe(200);
@@ -53,6 +57,30 @@ describe("api integration", () => {
     expect([200, 409]).toContain(res.status);
     expect(typeof res.body.score).toBe("number");
     expect(res.body.policy).toBeTruthy();
+  });
+
+  it("validates PR link analysis payload", async () => {
+    const res = await request(app).post("/api/analyze/pr-link").send({ url: "not-a-url" });
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toContain("valid GitHub pull request link");
+  });
+
+  it("analyzes using GitHub PR URL ingestion", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [{ filename: "src/auth.ts", patch: "+ const token = sign(payload, secret)" }]
+    }));
+
+    const res = await request(app)
+      .post("/api/analyze/pr-link")
+      .send({ url: "https://github.com/vercel/next.js/pull/123" });
+
+    expect([200, 409]).toContain(res.status);
+    expect(typeof res.body.score).toBe("number");
+    expect(res.body.source).toBe("pr-link");
+    expect(res.body.pr.repo).toBe("next.js");
+    expect(res.body.pr.prNumber).toBe(123);
   });
 
   it("rejects webhook with invalid signature when secret is configured", async () => {

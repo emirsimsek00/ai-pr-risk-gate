@@ -23,6 +23,7 @@ Backend service that scores pull requests for operational/security risk before m
 
 ## MVP features
 - Risk score (0-100) from changed files + patch heuristics
+- PR URL ingestion endpoint (`POST /api/analyze/pr-link`) for user-friendly one-link analysis
 - Severity levels: low / medium / high / critical
 - Findings + recommendations
 - Optional PR comment posting via GitHub API
@@ -109,8 +110,9 @@ This starts:
 - app on `http://localhost:8787`
 - postgres on `localhost:5432`
 
-## Analyze endpoint
-`POST /analyze` (alias: `POST /api/analyze`)
+## Analyze endpoints
+- `POST /analyze` (alias: `POST /api/analyze`) for direct payload analysis
+- `POST /api/analyze/pr-link` for GitHub PR URL ingestion
 
 ```json
 {
@@ -134,6 +136,14 @@ Response:
   "findings": ["Authentication/authorization-related code changed"],
   "recommendations": ["Require security review and add auth regression tests"]
 }
+```
+
+PR URL ingestion example:
+```bash
+curl -X POST https://ai-pr-risk-gate.onrender.com/api/analyze/pr-link \
+  -H "content-type: application/json" \
+  -H "x-api-key: <write-key>" \
+  -d '{"url":"https://github.com/vercel/next.js/pull/123"}'
 ```
 
 ## GitHub integration
@@ -210,6 +220,7 @@ Examples:
 ## Documentation
 - Diagram + request flow: `docs/ARCHITECTURE.md`
 - Threat model: `docs/THREAT-MODEL.md`
+- Employer readiness checklist: `docs/EMPLOYER_READINESS.md`
 
 ## Configuration
 - Full env/config reference: `docs/CONFIGURATION.md`

@@ -11,9 +11,14 @@ export async function fetchPullRequestFiles(input: {
   owner: string;
   repo: string;
   prNumber: number;
+  allowUnauthenticated?: boolean;
 }): Promise<ChangedFile[]> {
   const token = process.env.GITHUB_TOKEN;
-  if (!token) throw new Error("GITHUB_TOKEN is required for webhook-driven PR fetch");
+  const allowUnauthenticated = input.allowUnauthenticated === true;
+
+  if (!token && !allowUnauthenticated) {
+    throw new Error("GITHUB_TOKEN is required for webhook-driven PR fetch");
+  }
 
   const perPage = 100;
   let page = 1;
@@ -24,12 +29,12 @@ export async function fetchPullRequestFiles(input: {
     url.searchParams.set("per_page", String(perPage));
     url.searchParams.set("page", String(page));
 
-    const res = await fetchWithRetry(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json"
-      }
-    });
+    const headers: Record<string, string> = {
+      Accept: "application/vnd.github+json"
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetchWithRetry(url, { headers });
 
     if (!res.ok) {
       const body = await res.text();

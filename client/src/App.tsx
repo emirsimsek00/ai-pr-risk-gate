@@ -27,6 +27,21 @@ function getStoredKey(name: string) {
   return window.sessionStorage.getItem(name) ?? "";
 }
 
+function parseGithubPrUrl(url: string) {
+  try {
+    const parsed = new URL(url.trim());
+    const host = parsed.hostname.toLowerCase();
+    if (host !== "github.com" && host !== "www.github.com") return null;
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    if (segments.length < 4 || segments[2] !== "pull") return null;
+    const prNumber = Number(segments[3]);
+    if (!Number.isInteger(prNumber) || prNumber <= 0) return null;
+    return { owner: segments[0], repo: segments[1], prNumber };
+  } catch {
+    return null;
+  }
+}
+
 function shell(children: ReactNode) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#070611] text-white">
@@ -69,6 +84,8 @@ function Header({ dashboard, onSwitch }: { dashboard: boolean; onSwitch: (next: 
 }
 
 function AnalyzerView() {
+  const [mode, setMode] = useState<"pr-link" | "manual">("pr-link");
+  const [prUrl, setPrUrl] = useState("https://github.com/vercel/next.js/pull/1");
   const [repo, setRepo] = useState("ai-pr-risk-gate");
   const [prNumber, setPrNumber] = useState(1);
   const [filename, setFilename] = useState("src/auth/jwt.ts");
@@ -90,10 +107,17 @@ function AnalyzerView() {
     setIssuingKey(true);
     setError(null);
     try {
+      const parsed = parseGithubPrUrl(prUrl);
+      const targetRepo = mode === "pr-link" ? (parsed?.repo ?? "") : repo;
+      if (!targetRepo.trim()) {
+        setError(mode === "pr-link" ? "Enter a valid GitHub PR URL first." : "Repo is required to issue a key.");
+        return;
+      }
+
       const res = await fetch("/api/onboarding/issue-key", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ repo, ownerLabel: "self-serve-ui" })
+        body: JSON.stringify({ repo: targetRepo, ownerLabel: "self-serve-ui" })
       });
       const data = await res.json();
       if (!res.ok) return setError(data.error ?? "Could not issue key");
@@ -117,11 +141,12 @@ function AnalyzerView() {
         ...(writeKey.trim() ? { "x-api-key": writeKey.trim() } : {})
       };
 
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ repo, prNumber, files: [{ filename, patch }] })
-      });
+      const endpoint = mode === "pr-link" ? "/api/analyze/pr-link" : "/api/analyze";
+      const body = mode === "pr-link"
+        ? JSON.stringify({ url: prUrl })
+        : JSON.stringify({ repo, prNumber, files: [{ filename, patch }] });
+
+      const res = await fetch(endpoint, { method: "POST", headers, body });
       const data = await res.json();
       if (!res.ok) return setError(data.error ?? "Request failed");
       setResult(data);
@@ -138,10 +163,36 @@ function AnalyzerView() {
       <section className="rounded-2xl border border-white/15 bg-black/35 p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition duration-300 hover:-translate-y-0.5 hover:bg-black/40">
         <h2 className="mb-4 text-xl font-medium">Run a Risk Analysis</h2>
         <div className="space-y-3">
-          <label className="block text-sm text-zinc-100/90">Repo<input value={repo} onChange={(e) => setRepo(e.target.value)} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
-          <label className="block text-sm text-zinc-100/90">PR Number<input type="number" value={prNumber} onChange={(e) => setPrNumber(Number(e.target.value || 1))} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
-          <label className="block text-sm text-zinc-100/90">Filename<input value={filename} onChange={(e) => setFilename(e.target.value)} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
-          <label className="block text-sm text-zinc-100/90">Patch Snippet<textarea value={patch} onChange={(e) => setPatch(e.target.value)} className="mt-1 h-28 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-white/15 bg-white/5 p-1">
+            <button onClick={() => setMode("pr-link")} className={`rounded-md px-3 py-2 text-sm ${mode === "pr-link" ? "bg-zinc-400 text-black" : "bg-transparent text-zinc-100/90 hover:bg-white/10"}`}>
+              Analyze by PR URL
+            </button>
+            <button onClick={() => setMode("manual")} className={`rounded-md px-3 py-2 text-sm ${mode === "manual" ? "bg-zinc-400 text-black" : "bg-transparent text-zinc-100/90 hover:bg-white/10"}`}>
+              Manual Patch Input
+            </button>
+          </div>
+
+          {mode === "pr-link" ? (
+            <>
+              <label className="block text-sm text-zinc-100/90">
+                GitHub Pull Request URL
+                <input
+                  value={prUrl}
+                  onChange={(e) => setPrUrl(e.target.value)}
+                  placeholder="https://github.com/owner/repo/pull/123"
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2"
+                />
+              </label>
+              <p className="text-xs text-zinc-200/80">Paste a public GitHub PR link. We fetch changed files automatically for a more user-friendly analysis flow.</p>
+            </>
+          ) : (
+            <>
+              <label className="block text-sm text-zinc-100/90">Repo<input value={repo} onChange={(e) => setRepo(e.target.value)} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
+              <label className="block text-sm text-zinc-100/90">PR Number<input type="number" value={prNumber} onChange={(e) => setPrNumber(Number(e.target.value || 1))} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
+              <label className="block text-sm text-zinc-100/90">Filename<input value={filename} onChange={(e) => setFilename(e.target.value)} className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
+              <label className="block text-sm text-zinc-100/90">Patch Snippet<textarea value={patch} onChange={(e) => setPatch(e.target.value)} className="mt-1 h-28 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2" /></label>
+            </>
+          )}
           <label className="block text-sm text-zinc-100/90">Write API Key (optional)
             <input
               value={writeKey}
@@ -194,11 +245,11 @@ function GuideView() {
     <section className="rounded-2xl border border-white/15 bg-black/35 p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
       <h2 className="mb-3 text-2xl font-semibold">How to Use This Product</h2>
       <ol className="list-decimal space-y-2 pl-6 text-sm text-zinc-50/95">
-        <li>Start in <strong>Analyzer</strong>. Enter a repo, PR number, filename, and patch snippet, then click <strong>Analyze Risk</strong>.</li>
+        <li>Start in <strong>Analyzer</strong>. For the easiest flow, paste a GitHub pull request URL and click <strong>Analyze Risk</strong>. You can also switch to manual patch input.</li>
         <li>Read the <strong>Risk Score</strong>, severity, findings, and recommendations. If policy blocks the PR, address the listed findings first.</li>
         <li>Open <strong>Dashboard</strong> to monitor trends over time: average risk, high/critical counts, recurring findings, and recent assessments.</li>
         <li>Use the dashboard filters (repo + date range) to review one repository or your broader team activity.</li>
-        <li>For CI integration, call <code>POST /api/analyze</code> from your workflow; use dashboard metrics to tune your risk policy thresholds.</li>
+        <li>For automation, call <code>POST /api/analyze</code> (manual payload) or <code>POST /api/analyze/pr-link</code> (PR URL ingestion) from your workflow/tooling.</li>
       </ol>
       <p className="mt-3 text-xs text-zinc-200/80">Tip: if your API is protected with API keys, make sure your frontend/session includes a read key for dashboard endpoints and a write key for analyze endpoints.</p>
     </section>

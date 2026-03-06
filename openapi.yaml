@@ -69,6 +69,43 @@ paths:
               schema: { $ref: '#/components/schemas/AnalyzeResponse' }
         '400':
           description: Invalid payload
+  /api/analyze/pr-link:
+    post:
+      tags: [Analysis]
+      summary: Analyze risk directly from a GitHub pull request URL
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  description: GitHub PR URL like https://github.com/owner/repo/pull/123
+      responses:
+        '200':
+          description: Analysis complete, policy allows
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnalyzeResponse' }
+        '409':
+          description: Analysis complete, policy blocks
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnalyzeResponse' }
+        '400':
+          description: Invalid URL or request body
+        '404':
+          description: Pull request not found or inaccessible
+        '429':
+          description: GitHub API rate limit reached
+        '502':
+          description: Upstream fetch failure
   /api/trends:
     get:
       tags: [Analytics]
