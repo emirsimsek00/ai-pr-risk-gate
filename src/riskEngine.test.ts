@@ -19,12 +19,13 @@ describe("risk engine", () => {
       { filename: "src/auth/b.ts", patch: "+ token" }
     ]);
 
-    expect(result.findings).toHaveLength(1);
-    expect(result.recommendations).toHaveLength(1);
+    expect(result.findings.filter((f) => f === "Authentication/authorization-related code changed")).toHaveLength(1);
+    expect(result.recommendations.filter((r) => r === "Require security review and add auth regression tests")).toHaveLength(1);
   });
 
   it("returns low severity for low score and caps at 100", () => {
     const low = evaluateRisk([{ filename: "README.md", patch: "+ docs" }]);
+    expect(low.score).toBeGreaterThan(0);
     expect(low.severity).toBe("low");
 
     const many = Array.from({ length: 100 }, (_, i) => ({

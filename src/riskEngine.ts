@@ -39,12 +39,43 @@ const RULES = [
   }
 ];
 
+function countPatchDelta(patch?: string) {
+  if (!patch) return { additions: 0, deletions: 0 };
+
+  let additions = 0;
+  let deletions = 0;
+  for (const line of patch.split("\n")) {
+    if (line.startsWith("+++") || line.startsWith("---")) continue;
+    if (line.startsWith("+")) additions += 1;
+    if (line.startsWith("-")) deletions += 1;
+  }
+
+  return { additions, deletions };
+}
+
 export function evaluateRisk(files: ChangedFile[]): RiskResult {
   let score = 0;
   const findings = new Set<string>();
   const recommendations = new Set<string>();
 
+  if (files.length > 0) {
+    score += 5;
+    findings.add("Code changes detected");
+    recommendations.add("Ensure at least one reviewer validates intent and correctness");
+  }
+
+  if (files.length >= 3) {
+    score += 6;
+    findings.add("Multi-file change set");
+    recommendations.add("Review cross-file interactions and integration impact");
+  }
+
+  let totalDelta = 0;
+
   for (const file of files) {
+    const { additions, deletions } = countPatchDelta(file.patch);
+    totalDelta += additions + deletions;
+
     for (const rule of RULES) {
       if (rule.test(file)) {
         score += rule.points;
@@ -52,6 +83,18 @@ export function evaluateRisk(files: ChangedFile[]): RiskResult {
         recommendations.add(rule.recommendation);
       }
     }
+  }
+
+  if (totalDelta > 50) {
+    score += 8;
+    findings.add("Moderate code churn detected");
+    recommendations.add("Increase review depth and run targeted regression tests");
+  }
+
+  if (totalDelta > 200) {
+    score += 12;
+    findings.add("High code churn detected");
+    recommendations.add("Require senior reviewer sign-off before merge");
   }
 
   if (files.length > 25) {
